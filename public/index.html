@@ -617,26 +617,38 @@
             document.getElementById('kpiPLU').textContent = plu?.libelle || plu?.typezone || '—';
         }
         
-      function renderTransacties() {
+     function renderTransacties() {
     const c = document.getElementById('transactiesContent');
+    const adres = state.location.properties.label;
     const [lon, lat] = state.location.geometry.coordinates;
     
     c.innerHTML = `
+        <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px">
+            <div style="font-weight:600;margin-bottom:8px">📍 Gezocht adres</div>
+            <div style="font-family:monospace;background:var(--bg);padding:12px;border-radius:6px;user-select:all">${adres}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:8px">Kopieer dit adres en plak in onderstaande tools</div>
+        </div>
+        
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
-            <a href="https://immobilier.pappers.fr/?lat=${lat}&lon=${lon}&z=16" target="_blank" 
+            <a href="https://explore.data.gouv.fr/fr/immobilier" target="_blank" 
                style="display:block;padding:24px;background:linear-gradient(135deg,#800000,#a00000);border-radius:12px;text-decoration:none;color:#fff;text-align:center">
-                <div style="font-size:32px;margin-bottom:12px">🏠</div>
-                <div style="font-size:16px;font-weight:600;margin-bottom:8px">Pappers Immobilier</div>
-                <div style="font-size:13px;opacity:0.9">Transacties, kadaster, DPE, eigenaren</div>
-                <div style="margin-top:16px;padding:8px 16px;background:rgba(255,255,255,0.2);border-radius:6px;font-size:13px">Open Pappers →</div>
-            </a>
-            <a href="https://explore.data.gouv.fr/fr/immobilier?onglet=carte&lat=${lat}&lon=${lon}&zoom=16&filtre=tous" target="_blank"
-               style="display:block;padding:24px;background:var(--bg);border:2px solid var(--border);border-radius:12px;text-decoration:none;color:var(--text);text-align:center">
                 <div style="font-size:32px;margin-bottom:12px">💶</div>
                 <div style="font-size:16px;font-weight:600;margin-bottom:8px">DVF Explorer</div>
-                <div style="font-size:13px;color:var(--text-muted)">Officiële overheidsdata</div>
-                <div style="margin-top:16px;padding:8px 16px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--primary)">Open DVF →</div>
+                <div style="font-size:13px;opacity:0.9">Officiële overheidsdata (gratis, onbeperkt)</div>
+                <div style="margin-top:16px;padding:8px 16px;background:rgba(255,255,255,0.2);border-radius:6px;font-size:13px">Open DVF →</div>
             </a>
+            <a href="https://app.dvf.etalab.gouv.fr/" target="_blank"
+               style="display:block;padding:24px;background:var(--bg);border:2px solid var(--border);border-radius:12px;text-decoration:none;color:var(--text);text-align:center">
+                <div style="font-size:32px;margin-bottom:12px">🗺️</div>
+                <div style="font-size:16px;font-weight:600;margin-bottom:8px">DVF Etalab (klassiek)</div>
+                <div style="font-size:13px;color:var(--text-muted)">Oude interface, per parcelle</div>
+                <div style="margin-top:16px;padding:8px 16px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--primary)">Open Etalab →</div>
+            </a>
+        </div>
+        
+        <div style="margin-top:16px;padding:16px;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;font-size:13px">
+            <strong>💡 Tip:</strong> Pappers Immobilier toont meer data (eigenaren, vergunningen) maar beperkt gratis toegang tot ±10x.
+            <a href="https://immobilier.pappers.fr/" target="_blank" style="color:#800000;margin-left:4px">Probeer Pappers →</a>
         </div>
     `;
 }
