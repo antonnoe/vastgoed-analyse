@@ -617,9 +617,8 @@
             document.getElementById('kpiPLU').textContent = plu?.libelle || plu?.typezone || '—';
         }
         
-        function renderTransacties() {
+      function renderTransacties() {
     const c = document.getElementById('transactiesContent');
-    const dvf = state.data.dvf || {};
     const [lon, lat] = state.location.geometry.coordinates;
     
     c.innerHTML = `
@@ -631,7 +630,7 @@
                 <div style="font-size:13px;opacity:0.9">Transacties, kadaster, DPE, eigenaren</div>
                 <div style="margin-top:16px;padding:8px 16px;background:rgba(255,255,255,0.2);border-radius:6px;font-size:13px">Open Pappers →</div>
             </a>
-            <a href="https://explore.data.gouv.fr/immobilier?onglet=carte&lat=${lat}&lon=${lon}&zoom=16" target="_blank"
+            <a href="https://explore.data.gouv.fr/fr/immobilier?onglet=carte&lat=${lat}&lon=${lon}&zoom=16&filtre=tous" target="_blank"
                style="display:block;padding:24px;background:var(--bg);border:2px solid var(--border);border-radius:12px;text-decoration:none;color:var(--text);text-align:center">
                 <div style="font-size:32px;margin-bottom:12px">💶</div>
                 <div style="font-size:16px;font-weight:600;margin-bottom:8px">DVF Explorer</div>
