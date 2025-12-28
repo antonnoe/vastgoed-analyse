@@ -618,34 +618,29 @@
         }
         
         function renderTransacties() {
-            const c = document.getElementById('transactiesContent');
-            const txs = state.data.dvf?.resultats || [];
-            
-            if (!txs.length) {
-                c.innerHTML = '<div class="ifr-empty"><div class="ifr-empty-icon">🏠</div><p>Geen transacties gevonden binnen 500 meter.</p></div>';
-                return;
-            }
-            
-            const rows = txs.slice(0, 20).map(t => {
-                const price = parseFloat(t.valeur_fonciere || 0);
-                const surface = parseFloat(t.surface_reelle_bati || 0);
-                const ppm2 = surface > 0 ? Math.round(price / surface) : 0;
-                const type = t.type_local || 'Inconnu';
-                const isH = type.toLowerCase().includes('maison');
-                return `<tr>
-                    <td>${formatDate(t.date_mutation)}</td>
-                    <td><span class="ifr-type-badge ${isH ? 'maison' : 'appartement'}">${isH ? '🏠' : '🏢'} ${type}</span></td>
-                    <td class="right price">${price > 0 ? formatPrice(price) : '—'}</td>
-                    <td class="right">${surface > 0 ? `${surface} m²` : '—'}</td>
-                    <td class="right ppm2">${ppm2 > 0 ? `€${ppm2}` : '—'}</td>
-                    <td class="center">${t.nombre_pieces_principales || '—'}</td>
-                </tr>`;
-            }).join('');
-            
-            c.innerHTML = `<div style="overflow-x:auto"><table class="ifr-table"><thead><tr>
-                <th>Datum</th><th>Type</th><th class="right">Prijs</th><th class="right">Opp.</th><th class="right">€/m²</th><th class="center">Kamers</th>
-            </tr></thead><tbody>${rows}</tbody></table></div>`;
-        }
+    const c = document.getElementById('transactiesContent');
+    const dvf = state.data.dvf || {};
+    const [lon, lat] = state.location.geometry.coordinates;
+    
+    c.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+            <a href="https://immobilier.pappers.fr/?lat=${lat}&lon=${lon}&z=16" target="_blank" 
+               style="display:block;padding:24px;background:linear-gradient(135deg,#800000,#a00000);border-radius:12px;text-decoration:none;color:#fff;text-align:center">
+                <div style="font-size:32px;margin-bottom:12px">🏠</div>
+                <div style="font-size:16px;font-weight:600;margin-bottom:8px">Pappers Immobilier</div>
+                <div style="font-size:13px;opacity:0.9">Transacties, kadaster, DPE, eigenaren</div>
+                <div style="margin-top:16px;padding:8px 16px;background:rgba(255,255,255,0.2);border-radius:6px;font-size:13px">Open Pappers →</div>
+            </a>
+            <a href="https://explore.data.gouv.fr/immobilier?onglet=carte&lat=${lat}&lon=${lon}&zoom=16" target="_blank"
+               style="display:block;padding:24px;background:var(--bg);border:2px solid var(--border);border-radius:12px;text-decoration:none;color:var(--text);text-align:center">
+                <div style="font-size:32px;margin-bottom:12px">💶</div>
+                <div style="font-size:16px;font-weight:600;margin-bottom:8px">DVF Explorer</div>
+                <div style="font-size:13px;color:var(--text-muted)">Officiële overheidsdata</div>
+                <div style="margin-top:16px;padding:8px 16px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--primary)">Open DVF →</div>
+            </a>
+        </div>
+    `;
+}
         
         function renderRisicos() {
             const c = document.getElementById('riskGrid');
