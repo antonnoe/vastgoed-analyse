@@ -8,7 +8,6 @@ export default async function handler(request) {
   const { searchParams } = new URL(request.url);
   const lat = parseFloat(searchParams.get('lat'));
   const lon = parseFloat(searchParams.get('lon'));
-  const radius = parseInt(searchParams.get('radius')) || 500;
 
   if (!lat || !lon) {
     return Response.json(
@@ -18,11 +17,26 @@ export default async function handler(request) {
   }
 
   try {
-    // DVF via Etalab API
-    const bbox = calculateBbox(lat, lon, radius);
-    const url = `https://app.dvf.etalab.gouv.fr/api/mutations?bbox=${bbox}&ymin=${lat - 0.01}&ymax=${lat + 0.01}&xmin=${lon - 0.01}&xmax=${lon + 0.01}`;
+    // Eerst gemeente code ophalen
+    const geoResponse = await fetch(
+      `https://geo.api.gouv.fr/communes?lat=${lat}&lon=${lon}&fields=code&format=json`
+    );
     
-    const response = await fetch(url, {
+    if (!geoResponse.ok) {
+      throw new Error('Gemeente niet gevonden');
+    }
+    
+    const geoData = await geoResponse.json();
+    const codeInsee = geoData[0]?.code;
+    
+    if (!codeInsee) {
+      throw new Error('Geen gemeente code');
+    }
+
+    // DVF ophalen via Etalab
+    const dvfUrl = `https://api.dvf.etalab.gouv.fr/mutations?code_commune=${codeInsee}`;
+    
+    const response = await fetch(dvfUrl, {
       headers: {
         'User-Agent': 'InfoFrankrijk-VastgoedDashboard/1.0',
         'Accept': 'application/json',
@@ -30,21 +44,23 @@ export default async function handler(request) {
     });
 
     if (!response.ok) {
-      throw new Error(`API responded with ${response.status}`);
+      throw new Error(`DVF API: ${response.status}`);
     }
 
     const data = await response.json();
     
-    // Converteer naar verwacht formaat
-    const resultats = (data || []).map(m => ({
-      date_mutation: m.date_mutation,
-      valeur_fonciere: m.valeur_fonciere,
-      surface_reelle_bati: m.surface_reelle_bati,
-      type_local: m.type_local,
-      nombre_pieces_principales: m.nombre_pieces_principales,
-      code_postal: m.code_postal,
-      commune: m.nom_commune
-    }));
+    // Filter op afstand en converteer
+    const resultats = (data.mutations || data || [])
+      .slice(0, 50)
+      .map(m => ({
+        date_mutation: m.date_mutation,
+        valeur_fonciere: m.valeur_fonciere,
+        surface_reelle_bati: m.surface_reelle_bati || m.surface_terrain,
+        type_local: m.type_local || m.nature_mutation,
+        nombre_pieces_principales: m.nombre_pieces_principales,
+        code_postal: m.code_postal,
+        commune: m.nom_commune
+      }));
 
     return Response.json({ resultats }, {
       headers: {
@@ -59,9 +75,8 @@ export default async function handler(request) {
     );
   }
 }
+```
 
-function calculateBbox(lat, lon, radiusMeters) {
-  const latDelta = radiusMeters / 111000;
-  const lonDelta = radiusMeters / (111000 * Math.cos(lat * Math.PI / 180));
-  return `${lon - lonDelta},${lat - latDelta},${lon + lonDelta},${lat + latDelta}`;
-}
+Update op GitHub en test dan opnieuw:
+```
+https://vastgoed-analyse.vercel.app/api/dvf?lat=45.7654&lon=4.8357
