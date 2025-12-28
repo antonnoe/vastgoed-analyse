@@ -1,4 +1,4 @@
-// Vercel Serverless Function - DVF (Demandes de Valeurs Foncières)
+// Vercel Serverless Function - DVF via OpenDataSoft
 
 export const config = {
   runtime: 'edge',
@@ -18,10 +18,13 @@ export default async function handler(request) {
   }
 
   try {
-    // Christian Quest DVF API (http, niet https)
-    const url = `http://api.cquest.org/dvf?lat=${lat}&lon=${lon}&dist=${radius}`;
+    // OpenDataSoft DVF+ API (stabiel, open data)
+    const url = new URL('https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/buildingref-france-demande-de-valeurs-foncieres-geolocalisee-millesime/records');
+    url.searchParams.set('limit', '50');
+    url.searchParams.set('where', `within_distance(geolocation, geom'POINT(${lon} ${lat})', ${radius}m)`);
+    url.searchParams.set('order_by', 'date_mutation DESC');
     
-    const response = await fetch(url, {
+    const response = await fetch(url.toString(), {
       headers: {
         'User-Agent': 'InfoFrankrijk-VastgoedDashboard/1.0',
         'Accept': 'application/json',
@@ -33,8 +36,19 @@ export default async function handler(request) {
     }
 
     const data = await response.json();
+    
+    // Converteer naar verwacht formaat
+    const resultats = (data.results || []).map(r => ({
+      date_mutation: r.date_mutation,
+      valeur_fonciere: r.valeur_fonciere,
+      surface_reelle_bati: r.surface_reelle_bati,
+      type_local: r.type_local,
+      nombre_pieces_principales: r.nombre_pieces_principales,
+      code_postal: r.code_postal,
+      commune: r.nom_commune
+    }));
 
-    return Response.json(data, {
+    return Response.json({ resultats }, {
       headers: {
         'Cache-Control': 's-maxage=3600, stale-while-revalidate=86400',
         'Access-Control-Allow-Origin': '*',
