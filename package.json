@@ -1,0 +1,25 @@
+{
+  "name": "vastgoed-analyse",
+  "version": "1.0.0",
+  "description": "Frans Vastgoed Analyse Dashboard - Open data voor Nederlandse kopers",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Static site, no build needed'",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [
+    "france",
+    "real-estate",
+    "vastgoed",
+    "dvf",
+    "georisques",
+    "cadastre"
+  ],
+  "author": "infofrankrijk.com",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/vastgoed-analyse"
+  }
+}
