@@ -18,8 +18,9 @@ export default async function handler(request) {
   }
 
   try {
-    // Officiële DVF API via data.gouv.fr
-    const url = `https://apidf-preprod.cerema.fr/dvf_opendata/geomutations/?lat=${lat}&lon=${lon}&dist=${radius}`;
+    // DVF via Etalab API
+    const bbox = calculateBbox(lat, lon, radius);
+    const url = `https://app.dvf.etalab.gouv.fr/api/mutations?bbox=${bbox}&ymin=${lat - 0.01}&ymax=${lat + 0.01}&xmin=${lon - 0.01}&xmax=${lon + 0.01}`;
     
     const response = await fetch(url, {
       headers: {
@@ -35,14 +36,14 @@ export default async function handler(request) {
     const data = await response.json();
     
     // Converteer naar verwacht formaat
-    const resultats = (data.features || []).map(f => ({
-      date_mutation: f.properties.datemut,
-      valeur_fonciere: f.properties.valeurfonc,
-      surface_reelle_bati: f.properties.sbati,
-      type_local: f.properties.libtypbien,
-      nombre_pieces_principales: f.properties.nbpieceprinc,
-      code_postal: f.properties.codepostal,
-      commune: f.properties.commune
+    const resultats = (data || []).map(m => ({
+      date_mutation: m.date_mutation,
+      valeur_fonciere: m.valeur_fonciere,
+      surface_reelle_bati: m.surface_reelle_bati,
+      type_local: m.type_local,
+      nombre_pieces_principales: m.nombre_pieces_principales,
+      code_postal: m.code_postal,
+      commune: m.nom_commune
     }));
 
     return Response.json({ resultats }, {
@@ -57,4 +58,10 @@ export default async function handler(request) {
       { status: 500 }
     );
   }
+}
+
+function calculateBbox(lat, lon, radiusMeters) {
+  const latDelta = radiusMeters / 111000;
+  const lonDelta = radiusMeters / (111000 * Math.cos(lat * Math.PI / 180));
+  return `${lon - lonDelta},${lat - latDelta},${lon + lonDelta},${lat + latDelta}`;
 }
