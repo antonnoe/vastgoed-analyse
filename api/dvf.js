@@ -75,8 +75,3 @@ export default async function handler(request) {
     );
   }
 }
-```
-
-Update op GitHub en test dan opnieuw:
-```
-https://vastgoed-analyse.vercel.app/api/dvf?lat=45.7654&lon=4.8357
