@@ -129,23 +129,40 @@ export default async function handler(request) {
     );
   }
 
-  // Parallelle API calls
+  // Parallelle API calls - sommige endpoints vereisen code_insee
   const [gaspar, argiles, radon, icpe, cavites, pollution, seisme] =
     await Promise.all([
-      fetchSafe(
-        `https://georisques.gouv.fr/api/v1/gaspar/risques?latlon=${lon},${lat}&rayon=1000`
-      ),
-      fetchSafe(`https://georisques.gouv.fr/api/v1/rga?latlon=${lon},${lat}`),
-      fetchSafe(`https://georisques.gouv.fr/api/v1/radon?latlon=${lon},${lat}`),
+      // GASPAR: code_insee vereist
+      codeInsee
+        ? fetchSafe(
+            `https://georisques.gouv.fr/api/v1/gaspar/risques?code_insee=${codeInsee}`
+          )
+        : null,
+      // Argiles (RGA): code_insee vereist
+      codeInsee
+        ? fetchSafe(
+            `https://georisques.gouv.fr/api/v1/rga?code_insee=${codeInsee}`
+          )
+        : null,
+      // Radon: code_insee vereist
+      codeInsee
+        ? fetchSafe(
+            `https://georisques.gouv.fr/api/v1/radon?code_insee=${codeInsee}`
+          )
+        : null,
+      // ICPE: latlon werkt nog
       fetchSafe(
         `https://georisques.gouv.fr/api/v1/installations_classees?latlon=${lon},${lat}&rayon=2000`
       ),
+      // Cavités: latlon werkt nog
       fetchSafe(
         `https://georisques.gouv.fr/api/v1/cavites?latlon=${lon},${lat}&rayon=500`
       ),
+      // SIS (pollution): latlon werkt nog
       fetchSafe(
         `https://georisques.gouv.fr/api/v1/sis?latlon=${lon},${lat}&rayon=500`
       ),
+      // Seisme: code_insee vereist
       codeInsee
         ? fetchSafe(
             `https://georisques.gouv.fr/api/v1/zonage_sismique?code_insee=${codeInsee}`
