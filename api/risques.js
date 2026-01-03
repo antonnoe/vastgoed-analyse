@@ -28,21 +28,6 @@ function processRisques(raw) {
     autres: [],
   };
 
-  // Argiles
-  if (raw.argiles?.data?.[0]) {
-    const alea = raw.argiles.data[0].alea;
-    const niveauMap = {
-      'Fort': 'fort',
-      'Moyen': 'moyen',
-      'Faible': 'faible',
-      'A priori nul': 'tres_faible',
-    };
-    result.argiles = {
-      niveau: niveauMap[alea] || 'inconnu',
-      alea: alea,
-    };
-  }
-
   // Radon
   if (raw.radon?.data?.[0]) {
     const cat = parseInt(raw.radon.data[0].classe_potentiel) || 0;
@@ -51,6 +36,49 @@ function processRisques(raw) {
       niveau: niveauMap[cat] || 'inconnu',
       categorie: cat,
     };
+  }
+
+  // Seisme zone
+  if (raw.seisme?.data?.[0]) {
+    const zoneStr = raw.seisme.data[0].zone_sismicite || '';
+    const zone = parseInt(raw.seisme.data[0].code_zone) || null;
+    const niveauMap = {
+      1: 'tres_faible',
+      2: 'faible',
+      3: 'moyen',
+      4: 'fort',
+      5: 'tres_fort',
+    };
+    result.seisme = {
+      niveau: niveauMap[zone] || 'inconnu',
+      zone: zone,
+      label: zoneStr,
+    };
+  }
+
+  // GASPAR (algemene risico's) - nieuwe structuur
+  if (raw.gaspar?.data?.[0]?.risques_detail) {
+    for (const risque of raw.gaspar.data[0].risques_detail) {
+      const type = (risque.libelle_risque_long || '').toLowerCase();
+      
+      if (type.includes('inondation') || type.includes('crue')) {
+        result.inondation.niveau = 'present';
+        result.inondation.details.push(risque.libelle_risque_long);
+      } else if (type.includes('tassements différentiels') || type.includes('argile')) {
+        result.argiles.niveau = 'present';
+        result.argiles.alea = risque.libelle_risque_long;
+      } else if (type.includes('séisme') || type.includes('sismique')) {
+        // Al verwerkt via seisme endpoint
+      } else if (type.includes('radon')) {
+        // Al verwerkt via radon endpoint
+      } else if (type.includes('industriel')) {
+        result.industriel.icpe_count = 1;
+      } else if (type.includes('mouvement de terrain')) {
+        result.autres.push(risque.libelle_risque_long);
+      } else {
+        result.autres.push(risque.libelle_risque_long);
+      }
+    }
   }
 
   // ICPE/SEVESO
@@ -82,37 +110,6 @@ function processRisques(raw) {
     };
   }
 
-  // GASPAR (algemene risico's)
-  if (raw.gaspar?.data) {
-    for (const risque of raw.gaspar.data) {
-      const type = (risque.libelle_risque_long || '').toLowerCase();
-      if (type.includes('inondation')) {
-        result.inondation.niveau = 'present';
-        result.inondation.details.push(risque.libelle_risque_long);
-      } else if (type.includes('séisme') || type.includes('sismique')) {
-        result.seisme.niveau = 'present';
-      } else {
-        result.autres.push(risque.libelle_risque_long);
-      }
-    }
-  }
-
-  // Seisme zone
-  if (raw.seisme?.data?.[0]?.zone_sismicite) {
-    const zone = parseInt(raw.seisme.data[0].zone_sismicite);
-    const niveauMap = {
-      1: 'tres_faible',
-      2: 'faible',
-      3: 'moyen',
-      4: 'fort',
-      5: 'tres_fort',
-    };
-    result.seisme = {
-      niveau: niveauMap[zone] || 'inconnu',
-      zone: zone,
-    };
-  }
-
   return result;
 }
 
@@ -129,19 +126,13 @@ export default async function handler(request) {
     );
   }
 
-  // Parallelle API calls - sommige endpoints vereisen code_insee
-  const [gaspar, argiles, radon, icpe, cavites, pollution, seisme] =
+  // Parallelle API calls
+  const [gaspar, radon, icpe, cavites, pollution, seisme] =
     await Promise.all([
-      // GASPAR: code_insee vereist
+      // GASPAR: code_insee vereist - geeft overzicht van alle risico's
       codeInsee
         ? fetchSafe(
             `https://georisques.gouv.fr/api/v1/gaspar/risques?code_insee=${codeInsee}`
-          )
-        : null,
-      // Argiles (RGA): code_insee vereist
-      codeInsee
-        ? fetchSafe(
-            `https://georisques.gouv.fr/api/v1/rga?code_insee=${codeInsee}`
           )
         : null,
       // Radon: code_insee vereist
@@ -150,15 +141,15 @@ export default async function handler(request) {
             `https://georisques.gouv.fr/api/v1/radon?code_insee=${codeInsee}`
           )
         : null,
-      // ICPE: latlon werkt nog
+      // ICPE: latlon werkt
       fetchSafe(
         `https://georisques.gouv.fr/api/v1/installations_classees?latlon=${lon},${lat}&rayon=2000`
       ),
-      // Cavités: latlon werkt nog
+      // Cavités: latlon werkt
       fetchSafe(
         `https://georisques.gouv.fr/api/v1/cavites?latlon=${lon},${lat}&rayon=500`
       ),
-      // SIS (pollution): latlon werkt nog
+      // SIS (pollution): latlon werkt
       fetchSafe(
         `https://georisques.gouv.fr/api/v1/sis?latlon=${lon},${lat}&rayon=500`
       ),
@@ -170,7 +161,7 @@ export default async function handler(request) {
         : null,
     ]);
 
-  const raw = { gaspar, argiles, radon, icpe, cavites, pollution, seisme };
+  const raw = { gaspar, radon, icpe, cavites, pollution, seisme };
   const processed = processRisques(raw);
 
   return Response.json(processed, {
