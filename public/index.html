@@ -420,7 +420,7 @@
                     <div class="ifr-kpi primary">
                         <div class="ifr-kpi-label">Gem. m² prijs</div>
                         <div class="ifr-kpi-value" id="kpiAvgPrice">—</div>
-                        <div class="ifr-kpi-note">Straal 500m, laatste 5 jaar</div>
+                        <div class="ifr-kpi-note">Straal 2km, 2025</div>
                     </div>
                     <div class="ifr-kpi">
                         <div class="ifr-kpi-label">Transacties</div>
@@ -442,10 +442,10 @@
             
             <div class="ifr-content" id="panelTransacties">
                 <h2>Recente vastgoedtransacties (DVF)</h2>
-                <p class="ifr-subtitle">Bron: Demandes de Valeurs Foncières — notariële aktes binnen 500m</p>
+                <p class="ifr-subtitle">Bron: Demandes de Valeurs Foncières — notariële aktes binnen 2km</p>
                 <div id="transactiesContent"></div>
                 <div class="ifr-tip">
-                    <strong>💡 Tip:</strong> DVF bevat alle notariële aktes sinds 2014. 
+                    <strong>💡 Tip:</strong> DVF bevat alle notariële aktes. 
                     Prijzen zijn exclusief notariskosten (±8% bij bestaande bouw).
                 </div>
             </div>
@@ -488,7 +488,7 @@
         // CONFIGURATION - Vercel API routes
         // ================================
         const API = {
-            ban: 'https://api-adresse.data.gouv.fr',  // Direct, no proxy needed
+            ban: 'https://api-adresse.data.gouv.fr',
             dvf: '/api/dvf',
             risques: '/api/risques',
             cadastre: '/api/cadastre',
@@ -538,7 +538,7 @@
         
         async function fetchDVF(lat, lon) {
             try {
-                const r = await fetch(`${API.dvf}?lat=${lat}&lon=${lon}&radius=500`);
+                const r = await fetch(`${API.dvf}?lat=${lat}&lon=${lon}&radius=2`);
                 state.data.dvf = await r.json();
             } catch (e) { state.data.dvf = { error: e.message }; }
         }
@@ -596,11 +596,11 @@
         }
         
         function renderKPIs() {
-            const txs = state.data.dvf?.resultats || [];
-            const prices = txs.filter(t => t.valeur_fonciere && t.surface_reelle_bati).map(t => parseFloat(t.valeur_fonciere) / parseFloat(t.surface_reelle_bati));
+            const txs = state.data.dvf?.transactions || [];
+            const prices = txs.filter(t => t.prix && t.surface).map(t => t.prix / t.surface);
             const avg = prices.length ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : null;
             
-            document.getElementById('kpiAvgPrice').textContent = avg ? `€${avg}` : '—';
+            document.getElementById('kpiAvgPrice').textContent = avg ? `€${avg.toLocaleString('nl-NL')}` : '—';
             document.getElementById('kpiCount').textContent = txs.length;
             
             const r = state.data.risques;
@@ -617,41 +617,50 @@
             document.getElementById('kpiPLU').textContent = plu?.libelle || plu?.typezone || '—';
         }
         
-     function renderTransacties() {
-    const c = document.getElementById('transactiesContent');
-    const adres = state.location.properties.label;
-    const [lon, lat] = state.location.geometry.coordinates;
-    
-    c.innerHTML = `
-        <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px">
-            <div style="font-weight:600;margin-bottom:8px">📍 Gezocht adres</div>
-            <div style="font-family:monospace;background:var(--bg);padding:12px;border-radius:6px;user-select:all">${adres}</div>
-            <div style="font-size:12px;color:var(--text-muted);margin-top:8px">Kopieer dit adres en plak in onderstaande tools</div>
-        </div>
-        
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
-            <a href="https://explore.data.gouv.fr/fr/immobilier" target="_blank" 
-               style="display:block;padding:24px;background:linear-gradient(135deg,#800000,#a00000);border-radius:12px;text-decoration:none;color:#fff;text-align:center">
-                <div style="font-size:32px;margin-bottom:12px">💶</div>
-                <div style="font-size:16px;font-weight:600;margin-bottom:8px">DVF Explorer</div>
-                <div style="font-size:13px;opacity:0.9">Officiële overheidsdata (gratis, onbeperkt)</div>
-                <div style="margin-top:16px;padding:8px 16px;background:rgba(255,255,255,0.2);border-radius:6px;font-size:13px">Open DVF →</div>
-            </a>
-            <a href="https://app.dvf.etalab.gouv.fr/" target="_blank"
-               style="display:block;padding:24px;background:var(--bg);border:2px solid var(--border);border-radius:12px;text-decoration:none;color:var(--text);text-align:center">
-                <div style="font-size:32px;margin-bottom:12px">🗺️</div>
-                <div style="font-size:16px;font-weight:600;margin-bottom:8px">DVF Etalab (klassiek)</div>
-                <div style="font-size:13px;color:var(--text-muted)">Oude interface, per parcelle</div>
-                <div style="margin-top:16px;padding:8px 16px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--primary)">Open Etalab →</div>
-            </a>
-        </div>
-        
-        <div style="margin-top:16px;padding:16px;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;font-size:13px">
-            <strong>💡 Tip:</strong> Pappers Immobilier toont meer data (eigenaren, vergunningen) maar beperkt gratis toegang tot ±10x.
-            <a href="https://immobilier.pappers.fr/" target="_blank" style="color:#800000;margin-left:4px">Probeer Pappers →</a>
-        </div>
-    `;
-}
+        function renderTransacties() {
+            const c = document.getElementById('transactiesContent');
+            const txs = state.data.dvf?.transactions || [];
+            
+            if (!txs.length) {
+                c.innerHTML = '<div class="ifr-empty"><div class="ifr-empty-icon">📭</div><p>Geen transacties gevonden binnen 2km</p></div>';
+                return;
+            }
+            
+            const woningen = txs.filter(t => t.surface && (t.type === 'Maison' || t.type === 'Appartement'));
+            
+            c.innerHTML = `
+                <div style="margin-bottom:16px;padding:12px 16px;background:var(--bg);border-radius:8px;font-size:13px">
+                    <strong>${txs.length}</strong> transacties gevonden (2025) — waarvan <strong>${woningen.length}</strong> woningen met oppervlakte
+                </div>
+                <table class="ifr-table">
+                    <thead>
+                        <tr>
+                            <th>Datum</th>
+                            <th>Type</th>
+                            <th>Adres</th>
+                            <th class="right">Prijs</th>
+                            <th class="right">m²</th>
+                            <th class="right">€/m²</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${txs.slice(0, 25).map(t => {
+                            const ppm2 = t.surface ? Math.round(t.prix / t.surface) : null;
+                            const typeClass = t.type === 'Maison' ? 'maison' : (t.type === 'Appartement' ? 'appartement' : '');
+                            return `<tr>
+                                <td>${formatDate(t.date)}</td>
+                                <td><span class="ifr-type-badge ${typeClass}">${t.type || '—'}</span></td>
+                                <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${t.adresse || ''}">${t.adresse || '—'}</td>
+                                <td class="right price">${formatPrice(t.prix)}</td>
+                                <td class="right">${t.surface || '—'}</td>
+                                <td class="right ppm2">${ppm2 ? '€' + ppm2.toLocaleString('nl-NL') : '—'}</td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+                ${txs.length > 25 ? `<p style="margin-top:12px;font-size:13px;color:var(--text-muted)">Toont 25 van ${txs.length} transacties</p>` : ''}
+            `;
+        }
         
         function renderRisicos() {
             const c = document.getElementById('riskGrid');
