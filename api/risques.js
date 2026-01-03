@@ -149,8 +149,3 @@ export default async function handler(request) {
     },
   });
 }
-```
-
-Test daarna met Bordeaux:
-```
-https://vastgoed-analyse-g9gb.vercel.app/api/risques?lat=44.8378&lon=-0.5792&code_insee=33063
