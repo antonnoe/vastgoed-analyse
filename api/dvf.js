@@ -43,17 +43,3 @@ export default async function handler(request) {
     );
   }
 }
-```
-
----
-
-## Hoe te doen in GitHub
-
-1. Ga naar `api/dvf.js` in je repo
-2. Klik op het **potlood-icoon** (Edit)
-3. Selecteer alles (Ctrl+A) en plak bovenstaande code
-4. Commit met bericht: `DVF: koppeling naar BigQuery Cloud Function`
-
-Vercel deployt automatisch. Test daarna:
-```
-https://vastgoed-analyse.vercel.app/api/dvf?lat=48.8566&lon=2.3522&radius=2
