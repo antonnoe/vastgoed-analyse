@@ -1,871 +1,819 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Frans Vastgoed Analyse — infofrankrijk.com</title>
-    <meta name="description" content="Analyseer elk Frans adres: vastgoedprijzen, risico's, kadaster, energie. Officiële open data voor Nederlandse kopers.">
-    <link rel="canonical" href="https://vastgoed-analyse.vercel.app/">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Mulish:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #800000;
-            --primary-dark: #5a0000;
-            --primary-light: rgba(128, 0, 0, 0.08);
-            --bg: #faf8f5;
-            --bg-alt: #f5f0eb;
-            --border: #e0d6cc;
-            --text: #2d2d2d;
-            --text-muted: #666;
-            --white: #fff;
-            --success: #2e7d32;
-            --warning: #ef6c00;
-            --danger: #c62828;
-        }
-        
-        * { box-sizing: border-box; }
-        
-        body {
-            font-family: 'Mulish', -apple-system, BlinkMacSystemFont, sans-serif;
-            line-height: 1.8;
-            color: var(--text);
-            background: linear-gradient(135deg, var(--bg) 0%, var(--bg-alt) 100%);
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-        }
-        
-        .ifr-dashboard { max-width: 1200px; margin: 0 auto; padding: 24px; }
-        
-        .ifr-header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            padding: 20px 24px;
-            border-radius: 16px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 20px rgba(128, 0, 0, 0.3);
-        }
-        
-        .ifr-header h1 {
-            font-family: 'Poppins', sans-serif;
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--white);
-            margin: 0;
-        }
-        
-        .ifr-header p {
-            color: rgba(255,255,255,0.75);
-            margin: 6px 0 0 0;
-            font-size: 13px;
-        }
-        
-        .ifr-search-box {
-            background: var(--white);
-            border-radius: 16px;
-            padding: 20px 24px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-            margin-bottom: 20px;
-            position: relative;
-        }
-        
-        .ifr-search-box label {
-            display: block;
-            font-family: 'Poppins', sans-serif;
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--primary);
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .ifr-search-input {
-            width: 100%;
-            padding: 14px 18px;
-            font-size: 16px;
-            font-family: inherit;
-            border: 2px solid var(--border);
-            border-radius: 10px;
-            outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        
-        .ifr-search-input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 4px var(--primary-light);
-        }
-        
-        .ifr-suggestions {
-            position: absolute;
-            top: 100%;
-            left: 24px;
-            right: 24px;
-            background: var(--white);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-            list-style: none;
-            margin: 4px 0 0 0;
-            padding: 6px;
-            z-index: 100;
-            display: none;
-        }
-        
-        .ifr-suggestions.active { display: block; }
-        
-        .ifr-suggestions li {
-            padding: 12px 14px;
-            cursor: pointer;
-            border-radius: 8px;
-            transition: background 0.15s;
-        }
-        
-        .ifr-suggestions li:hover { background: var(--bg); }
-        .ifr-suggestions .name { font-weight: 600; font-size: 14px; }
-        .ifr-suggestions .city { color: var(--text-muted); font-size: 13px; margin-left: 8px; }
-        
-        .ifr-tabs {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 20px;
-            overflow-x: auto;
-            padding-bottom: 4px;
-        }
-        
-        .ifr-tab {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 10px 16px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-family: 'Poppins', sans-serif;
-            font-size: 13px;
-            font-weight: 600;
-            transition: all 0.2s;
-            white-space: nowrap;
-            background: var(--white);
-            color: var(--text-muted);
-            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-        }
-        
-        .ifr-tab.active {
-            background: var(--primary);
-            color: var(--white);
-            box-shadow: 0 4px 12px rgba(128, 0, 0, 0.3);
-        }
-        
-        .ifr-content {
-            background: var(--white);
-            border-radius: 16px;
-            padding: 28px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-            display: none;
-        }
-        
-        .ifr-content.active { display: block; }
-        
-        .ifr-content h2 {
-            font-family: 'Poppins', sans-serif;
-            font-size: 20px;
-            font-weight: 600;
-            color: var(--primary);
-            margin: 0 0 6px 0;
-        }
-        
-        .ifr-content h3 {
-            font-family: 'Poppins', sans-serif;
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--primary);
-            margin: 24px 0 12px 0;
-        }
-        
-        .ifr-subtitle { color: var(--text-muted); margin: 0 0 20px 0; font-size: 14px; }
-        
-        .ifr-kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 16px;
-            margin-bottom: 28px;
-        }
-        
-        .ifr-kpi {
-            padding: 20px;
-            border-radius: 12px;
-            background: var(--white);
-            border: 2px solid var(--border);
-        }
-        
-        .ifr-kpi.primary {
-            background: linear-gradient(135deg, var(--primary) 0%, #a00000 100%);
-            border: none;
-            color: var(--white);
-        }
-        
-        .ifr-kpi-label { font-size: 12px; opacity: 0.8; }
-        
-        .ifr-kpi-value {
-            font-family: 'Poppins', sans-serif;
-            font-size: 28px;
-            font-weight: 700;
-            margin-top: 4px;
-        }
-        
-        .ifr-kpi:not(.primary) .ifr-kpi-value { color: var(--primary); }
-        .ifr-kpi-note { font-size: 11px; opacity: 0.7; margin-top: 2px; }
-        
-        .ifr-links-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 10px;
-        }
-        
-        .ifr-link {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 14px;
-            background: var(--bg);
-            border-radius: 8px;
-            text-decoration: none;
-            color: var(--text);
-            font-size: 13px;
-            transition: all 0.2s;
-            border: 1px solid transparent;
-        }
-        
-        .ifr-link:hover {
-            background: var(--white);
-            border-color: var(--primary);
-        }
-        
-        .ifr-link .icon { font-size: 18px; }
-        .ifr-link .label { font-weight: 600; }
-        .ifr-link .arrow { margin-left: auto; color: var(--primary); }
-        
-        .ifr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .ifr-table th { text-align: left; padding: 10px 12px; font-weight: 600; border-bottom: 2px solid var(--primary); }
-        .ifr-table th.right { text-align: right; }
-        .ifr-table th.center { text-align: center; }
-        .ifr-table td { padding: 12px; border-bottom: 1px solid #eee; }
-        .ifr-table tr:nth-child(even) { background: var(--bg); }
-        .ifr-table .right { text-align: right; }
-        .ifr-table .center { text-align: center; }
-        .ifr-table .price { font-weight: 600; }
-        .ifr-table .ppm2 { font-weight: 600; color: var(--primary); }
-        
-        .ifr-type-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-        
-        .ifr-type-badge.maison { background: var(--primary-light); color: var(--primary); }
-        .ifr-type-badge.appartement { background: rgba(0, 100, 150, 0.1); color: #006496; }
-        
-        .ifr-risk-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 16px;
-        }
-        
-        .ifr-risk-card {
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            background: var(--white);
-        }
-        
-        .ifr-risk-card.alert { border: 2px solid var(--danger); background: #fff5f5; }
-        
-        .ifr-risk-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-        .ifr-risk-icon { font-size: 24px; }
-        .ifr-risk-title { font-weight: 600; font-size: 14px; margin: 0; }
-        .ifr-risk-subtitle { font-size: 12px; color: var(--text-muted); }
-        
-        .ifr-risk-badge {
-            margin-left: auto;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        
-        .ifr-risk-badge.low { background: #e8f5e9; color: var(--success); }
-        .ifr-risk-badge.medium { background: #fff3e0; color: var(--warning); }
-        .ifr-risk-badge.high { background: #ffebee; color: var(--danger); }
-        .ifr-risk-badge.unknown { background: #f5f5f5; color: #9e9e9e; }
-        
-        .ifr-tip {
-            margin-top: 20px;
-            padding: 14px;
-            background: var(--bg);
-            border-radius: 8px;
-            border-left: 4px solid var(--primary);
-            font-size: 13px;
-        }
-        
-        .ifr-warning-box {
-            margin-top: 24px;
-            padding: 16px;
-            background: var(--primary);
-            border-radius: 10px;
-            color: var(--white);
-            font-size: 13px;
-        }
-        
-        .ifr-intro { text-align: center; padding: 48px 28px; }
-        .ifr-intro-icon { font-size: 56px; margin-bottom: 20px; }
-        .ifr-intro h2 { margin: 0 0 12px 0; }
-        .ifr-intro p { max-width: 500px; margin: 0 auto 28px; color: var(--text-muted); font-size: 15px; }
-        
-        .ifr-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-        .ifr-tag {
-            padding: 6px 14px;
-            background: var(--primary-light);
-            color: var(--primary);
-            border-radius: 16px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        
-        .ifr-footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
-        .ifr-footer strong { color: var(--primary); }
-        
-        .ifr-spinner {
-            width: 24px;
-            height: 24px;
-            border: 3px solid var(--border);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: ifr-spin 1s linear infinite;
-            display: inline-block;
-        }
-        
-        .ifr-loading { text-align: center; padding: 40px; }
-        .ifr-loading p { color: var(--text-muted); margin-top: 12px; }
-        .ifr-empty { text-align: center; padding: 40px; color: var(--text-muted); }
-        .ifr-empty-icon { font-size: 48px; }
-        
-        .ifr-btn {
-            display: inline-block;
-            padding: 12px 20px;
-            background: var(--primary);
-            color: var(--white);
-            border-radius: 8px;
-            text-decoration: none;
-            font-size: 13px;
-            font-weight: 600;
-            transition: background 0.2s;
-        }
-        
-        .ifr-btn:hover { background: var(--primary-dark); }
-        
-        @keyframes ifr-spin { to { transform: rotate(360deg); } }
-        
-        @media (max-width: 600px) {
-            .ifr-dashboard { padding: 16px; }
-            .ifr-header { padding: 16px; }
-            .ifr-header h1 { font-size: 20px; }
-            .ifr-content { padding: 20px; }
-            .ifr-kpi-value { font-size: 24px; }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🏠 Frans Vastgoed Analyse Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Mulish:wght@300;400;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --primary:#800000;
+      --primary-dark:#5a0000;
+      --bg:#faf7f4;
+      --card:#ffffff;
+      --text:#1f1f1f;
+      --text-muted:#666666;
+      --border:#eadfd6;
+      --shadow:0 8px 30px rgba(0,0,0,.06);
+      --radius:16px;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Mulish, Arial, sans-serif;
+      line-height:1.8em;
+      color:var(--text);
+      background:linear-gradient(180deg,#fff, var(--bg));
+    }
+
+    h1,h2,h3{
+      font-family:Poppins, Arial, sans-serif;
+      color:var(--primary);
+      line-height:1.35em;
+    }
+
+    .ifr-wrap{
+      max-width:1100px;
+      margin:0 auto;
+      padding:32px 18px 60px;
+    }
+
+    .ifr-header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:18px;
+      margin-bottom:18px;
+    }
+
+    .ifr-title{
+      margin:0;
+      font-size:28px;
+    }
+
+    .ifr-subtitle{
+      margin:6px 0 0;
+      color:var(--text-muted);
+      font-size:14px;
+    }
+
+    .ifr-card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:22px;
+    }
+
+    .ifr-search{
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+
+    .ifr-search input{
+      flex:1;
+      padding:12px 14px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      font-size:15px;
+      outline:none;
+    }
+
+    .ifr-search input:focus{
+      border-color:rgba(128,0,0,.45);
+      box-shadow:0 0 0 4px rgba(128,0,0,.08);
+    }
+
+    .ifr-btn{
+      padding:12px 14px;
+      border:0;
+      border-radius:12px;
+      background:var(--primary);
+      color:#fff;
+      font-weight:700;
+      cursor:pointer;
+      transition:transform .05s ease, background .2s ease;
+    }
+    .ifr-btn:hover{background:var(--primary-dark)}
+    .ifr-btn:active{transform:translateY(1px)}
+
+    .ifr-kpis{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:12px;
+      margin-top:16px;
+    }
+    @media (max-width: 980px){
+      .ifr-kpis{grid-template-columns:repeat(2,1fr)}
+    }
+
+    .ifr-kpi{
+      padding:14px 14px 12px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      background:#fff;
+    }
+    .ifr-kpi-label{font-size:12px;color:var(--text-muted);margin-bottom:6px}
+    .ifr-kpi-value{font-size:18px;font-weight:800}
+    .ifr-kpi-note{font-size:12px;color:var(--text-muted);margin-top:4px}
+
+    .ifr-tabs{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:18px;
+    }
+
+    .ifr-tab{
+      padding:10px 12px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:#fff;
+      cursor:pointer;
+      font-weight:700;
+      font-size:13px;
+      user-select:none;
+    }
+    .ifr-tab.active{
+      background:rgba(128,0,0,.08);
+      border-color:rgba(128,0,0,.35);
+      color:var(--primary);
+    }
+
+    .ifr-panel{margin-top:14px}
+    .ifr-panel.hidden{display:none}
+
+    .ifr-empty{
+      text-align:center;
+      padding:28px 10px;
+      color:var(--text-muted);
+    }
+    .ifr-empty-icon{font-size:30px;margin-bottom:10px}
+
+    .ifr-table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:13px;
+    }
+    .ifr-table th,.ifr-table td{
+      padding:10px 10px;
+      border-bottom:1px solid var(--border);
+      text-align:left;
+      vertical-align:top;
+    }
+    .ifr-table th{
+      font-family:Poppins, Arial, sans-serif;
+      color:var(--primary);
+      font-size:12px;
+      letter-spacing:.02em;
+    }
+    .right{text-align:right}
+
+    .badge{
+      display:inline-block;
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:800;
+      background:rgba(128,0,0,.08);
+      color:var(--primary);
+      border:1px solid rgba(128,0,0,.18);
+    }
+
+    .risk-pill{
+      display:inline-block;
+      padding:3px 8px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:800;
+      border:1px solid var(--border);
+      background:#fff;
+    }
+    .risk-pill.low{background:#f1fbf2;border-color:#cfe9d2;color:#166534}
+    .risk-pill.medium{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
+    .risk-pill.high{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+
+    /* [i] Info blok */
+    .infoBox{
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+      padding:12px 12px;
+      background:var(--bg);
+      border:1px solid var(--border);
+      border-left:4px solid var(--primary);
+      border-radius:12px;
+      font-size:13px;
+      color:#444;
+      margin:12px 0;
+    }
+    .infoIcon{
+      width:26px;
+      height:26px;
+      min-width:26px;
+      border-radius:999px;
+      background:rgba(128,0,0,.10);
+      border:1px solid rgba(128,0,0,.18);
+      color:var(--primary);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      line-height:1;
+      font-family:Poppins, Arial, sans-serif;
+    }
+    .infoBox p{margin:0}
+    .infoBox a{color:var(--primary);font-weight:700;text-decoration:underline}
+  </style>
 </head>
+
 <body>
-    <div class="ifr-dashboard" id="ifrDashboard">
-        <header class="ifr-header">
-            <h1>🏠 Frans Vastgoed Analyse</h1>
-            <p>DVF • Georisques • Kadaster • DPE • Officiële overheidsdata</p>
-        </header>
-        
-        <div class="ifr-search-box">
-            <label for="ifrSearch">Voer een Frans adres in</label>
-            <input type="text" id="ifrSearch" class="ifr-search-input" placeholder="Bijv: 15 rue de la République, Lyon" autocomplete="off">
-            <ul class="ifr-suggestions" id="ifrSuggestions"></ul>
-        </div>
-        
-        <div class="ifr-tabs" id="ifrTabs" style="display: none;">
-            <button class="ifr-tab active" data-tab="overzicht">📊 Overzicht</button>
-            <button class="ifr-tab" data-tab="transacties">💶 Transacties</button>
-            <button class="ifr-tab" data-tab="risicos">⚠️ Risico's</button>
-            <button class="ifr-tab" data-tab="kadaster">📐 Kadaster</button>
-            <button class="ifr-tab" data-tab="energie">⚡ Energie</button>
-        </div>
-        
-        <div id="ifrPanels">
-            <div class="ifr-content active" id="panelIntro">
-                <div class="ifr-intro">
-                    <div class="ifr-intro-icon">🏡</div>
-                    <h2>Analyseer elk Frans adres</h2>
-                    <p>Voer een adres in om officiële overheidsdata te bekijken: vastgoedprijzen, risico's, kadaster, energie en internet.</p>
-                    <div class="ifr-tags">
-                        <span class="ifr-tag">DVF Transacties</span>
-                        <span class="ifr-tag">Georisques</span>
-                        <span class="ifr-tag">Kadaster IGN</span>
-                        <span class="ifr-tag">PLU Urbanisme</span>
-                        <span class="ifr-tag">DPE Energie</span>
-                        <span class="ifr-tag">ARCEP Internet</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="ifr-content" id="panelOverzicht">
-                <h2>📍 <span id="selectedAddress">—</span></h2>
-                <div class="ifr-kpi-grid" id="kpiGrid">
-                    <div class="ifr-kpi primary">
-                        <div class="ifr-kpi-label">Gem. m² prijs</div>
-                        <div class="ifr-kpi-value" id="kpiAvgPrice">—</div>
-                        <div class="ifr-kpi-note">Straal 5km, 2025</div>
-                    </div>
-                    <div class="ifr-kpi">
-                        <div class="ifr-kpi-label">Transacties</div>
-                        <div class="ifr-kpi-value" id="kpiCount">—</div>
-                        <div class="ifr-kpi-note">In DVF database</div>
-                    </div>
-                    <div class="ifr-kpi">
-                        <div class="ifr-kpi-label">Hoogste risico</div>
-                        <div class="ifr-kpi-value" id="kpiRisk" style="font-size: 16px; margin-top: 8px;">—</div>
-                    </div>
-                    <div class="ifr-kpi">
-                        <div class="ifr-kpi-label">Zone PLU</div>
-                        <div class="ifr-kpi-value" id="kpiPLU" style="font-size: 14px; margin-top: 8px;">—</div>
-                    </div>
-                </div>
-                <h3>🔗 Officiële bronnen</h3>
-                <div class="ifr-links-grid" id="officialLinks"></div>
-            </div>
-            
-            <div class="ifr-content" id="panelTransacties">
-                <h2>Recente vastgoedtransacties (DVF)</h2>
-                <p class="ifr-subtitle">Bron: Demandes de Valeurs Foncières — notariële aktes binnen 5km</p>
-                <div id="transactiesContent"></div>
-                <div class="ifr-tip">
-                    <strong>💡 Tip:</strong> DVF bevat alle notariële aktes. 
-                    Prijzen zijn exclusief notariskosten (±8% bij bestaande bouw).
-                </div>
-            </div>
-            
-            <div class="ifr-content" id="panelRisicos">
-                <h2>Risico-analyse</h2>
-                <p class="ifr-subtitle">Bron: Georisques.gouv.fr — BRGM & Ministerie van Ecologie</p>
-                <div class="ifr-risk-grid" id="riskGrid"></div>
-            </div>
-            
-            <div class="ifr-content" id="panelKadaster">
-                <h2>Kadaster & Urbanisme</h2>
-                <p class="ifr-subtitle">Bronnen: API Carto (IGN), Géoportail de l'Urbanisme</p>
-                <div id="kadasterContent"></div>
-            </div>
-            
-            <div class="ifr-content" id="panelEnergie">
-                <h2>Energie & Connectiviteit</h2>
-                <p class="ifr-subtitle">Bronnen: ADEME DPE, ARCEP, BDNB</p>
-                <div id="energieContent"></div>
-            </div>
-        </div>
-        
-        <footer class="ifr-footer">
-            Data: data.gouv.fr • georisques.gouv.fr • api-adresse.data.gouv.fr • apicarto.ign.fr
-            <br>
-            <strong>infofrankrijk.com</strong> — voor Nederlanders in Frankrijk
-        </footer>
+  <div class="ifr-wrap">
+
+    <div class="ifr-header">
+      <div>
+        <h1 class="ifr-title">🏠 Frans Vastgoed Analyse Dashboard</h1>
+        <p class="ifr-subtitle">Officiële Franse data (DVF, GéoRisques, IGN, GPU, ADEME/ARCEP) samengebracht voor Nederlandse kopers.</p>
+      </div>
+      <div style="text-align:right;min-width:220px">
+        <span class="badge">Live</span>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:6px" id="nowDate">—</div>
+      </div>
     </div>
 
-    <script>
-    (function() {
-        'use strict';
-        
-        // ================================
-        // CONFIGURATION
-        // ================================
-        const API = {
-            ban: 'https://api-adresse.data.gouv.fr',
-            dvf: '/api/dvf',
-            risques: '/api/risques',
-            cadastre: '/api/cadastre',
-            urbanisme: '/api/urbanisme',
-            dpe: '/api/dpe'
-        };
-        
-        // ================================
-        // STATE
-        // ================================
-        let state = {
-            location: null,
-            data: { dvf: null, risques: null, cadastre: null, urbanisme: null }
-        };
-        
-        // ================================
-        // DOM
-        // ================================
-        const els = {
-            search: document.getElementById('ifrSearch'),
-            suggestions: document.getElementById('ifrSuggestions'),
-            tabs: document.getElementById('ifrTabs')
-        };
-        
-        // ================================
-        // UTILITIES
-        // ================================
-        const formatPrice = (p) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(p);
-        const formatDate = (d) => d ? new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-        const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
-        
-        const getRiskClass = (n) => ({ tres_faible: 'low', faible: 'low', moyen: 'medium', present: 'medium', fort: 'high', tres_fort: 'high' }[n] || 'unknown');
-        const getRiskLabel = (n) => ({ tres_faible: 'Zeer laag', faible: 'Laag', moyen: 'Gemiddeld', present: 'Aanwezig', fort: 'Hoog', tres_fort: 'Zeer hoog', inconnu: 'Onbekend' }[n] || 'Onbekend');
-        
-        // ================================
-        // API CALLS
-        // ================================
-        async function searchAddress(q) {
-            if (q.length < 3) { els.suggestions.classList.remove('active'); return; }
-            try {
-                const r = await fetch(`${API.ban}/search/?q=${encodeURIComponent(q)}&limit=6`);
-                const d = await r.json();
-                if (d.features?.length) renderSuggestions(d.features);
-                else els.suggestions.classList.remove('active');
-            } catch (e) { console.error('Search failed:', e); }
+    <div class="ifr-card">
+      <h2 style="margin:0 0 10px;font-size:18px">Adres opzoeken (BAN)</h2>
+      <div class="ifr-search">
+        <input id="q" placeholder="Typ een adres in Frankrijk (straat, postcode, plaats)..." autocomplete="off" />
+        <button class="ifr-btn" id="btnSearch">Zoek</button>
+      </div>
+      <div id="suggestions" style="margin-top:10px"></div>
+
+      <div class="ifr-kpis">
+        <div class="ifr-kpi">
+          <div class="ifr-kpi-label">Transacties</div>
+          <div class="ifr-kpi-value" id="kpiTx">—</div>
+          <div class="ifr-kpi-note">Straal 5km, DVF 2025</div>
+        </div>
+        <div class="ifr-kpi">
+          <div class="ifr-kpi-label">Gem. prijs/m²</div>
+          <div class="ifr-kpi-value" id="kpiAvgPrice">—</div>
+          <div class="ifr-kpi-note">Indicatief op basis DVF</div>
+        </div>
+        <div class="ifr-kpi">
+          <div class="ifr-kpi-label">Risico’s</div>
+          <div class="ifr-kpi-value" id="kpiRisk">—</div>
+          <div class="ifr-kpi-note">GéoRisques</div>
+        </div>
+        <div class="ifr-kpi">
+          <div class="ifr-kpi-label">PLU / GPU</div>
+          <div class="ifr-kpi-value" id="kpiPLU">—</div>
+          <div class="ifr-kpi-note">Géoportail Urbanisme</div>
+        </div>
+      </div>
+
+      <div class="ifr-tabs">
+        <div class="ifr-tab active" data-tab="overzicht">Overzicht</div>
+        <div class="ifr-tab" data-tab="transacties">Transacties</div>
+        <div class="ifr-tab" data-tab="risicos">Risico’s</div>
+        <div class="ifr-tab" data-tab="kadaster">Kadaster</div>
+        <div class="ifr-tab" data-tab="energie">Energie</div>
+      </div>
+
+      <div class="ifr-panel" id="panel-overzicht">
+        <div id="overzichtContent" class="ifr-card" style="margin-top:14px">
+          <div class="ifr-empty">
+            <div class="ifr-empty-icon">🧭</div>
+            <p>Zoek een adres om officiële data en links te tonen.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="ifr-panel hidden" id="panel-transacties">
+        <div class="ifr-card" style="margin-top:14px">
+          <h2 style="margin:0 0 6px;font-size:18px">Transacties (DVF)</h2>
+          <p class="ifr-subtitle">Bron: Demandes de Valeurs Foncières — notariële aktes binnen 5km</p>
+          <div id="transactiesContent"></div>
+        </div>
+      </div>
+
+      <div class="ifr-panel hidden" id="panel-risicos">
+        <div class="ifr-card" style="margin-top:14px">
+          <h2 style="margin:0 0 6px;font-size:18px">Risico’s (GéoRisques)</h2>
+          <p class="ifr-subtitle">Overstroming, radon, seismisch, klei, SEVESO, enz.</p>
+          <div id="risicosContent"></div>
+        </div>
+      </div>
+
+      <div class="ifr-panel hidden" id="panel-kadaster">
+        <div class="ifr-card" style="margin-top:14px">
+          <h2 style="margin:0 0 6px;font-size:18px">Kadaster / PLU zone</h2>
+          <p class="ifr-subtitle">Perceel, section, gemeente, GPU/PLU waar beschikbaar</p>
+          <div id="kadasterContent"></div>
+        </div>
+      </div>
+
+      <div class="ifr-panel hidden" id="panel-energie">
+        <div class="ifr-card" style="margin-top:14px">
+          <h2 style="margin:0 0 6px;font-size:18px">Energie & internet</h2>
+          <p class="ifr-subtitle">DPE context + ARCEP dekking (glasvezel/mobiel)</p>
+          <div id="energieContent"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =============================
+    // Helpers / State
+    // =============================
+    const now = new Date();
+    document.getElementById('nowDate').textContent = now.toLocaleDateString('nl-NL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+    const getRiskClass = (n) => ({ tres_faible: 'low', faible: 'low', moyen: 'medium', fort: 'high', tres_fort: 'high' }[n] || 'medium');
+
+    const state = {
+      location: null,
+      data: { dvf: null, risques: null, cadastre: null, urbanisme: null, dpe: null }
+    };
+
+    const API = {
+      ban: 'https://api-adresse.data.gouv.fr',
+      dvf: '/api/dvf',
+      risques: '/api/risques',
+      cadastre: '/api/cadastre',
+      urbanisme: '/api/urbanisme',
+      dpe: '/api/dpe'
+    };
+
+    const DVF_YEAR = 2025;
+    const DVF_RADIUS_KM = 5;
+    const DVF_SOURCE_NOTE = "DVF 2025 (alternatieve API; officiële overheid-API onbetrouwbaar)";
+
+    // =============================
+    // Tabs
+    // =============================
+    document.querySelectorAll('.ifr-tab').forEach(t => {
+      t.addEventListener('click', () => {
+        document.querySelectorAll('.ifr-tab').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+
+        const tab = t.getAttribute('data-tab');
+        document.querySelectorAll('.ifr-panel').forEach(p => p.classList.add('hidden'));
+        document.getElementById(`panel-${tab}`).classList.remove('hidden');
+
+        if (state.location) {
+          if (tab === 'overzicht') renderOverzicht();
+          if (tab === 'transacties') renderTransacties();
+          if (tab === 'risicos') renderRisicos();
+          if (tab === 'kadaster') renderKadaster();
+          if (tab === 'energie') renderEnergie();
         }
-        
-        async function fetchDVF(lat, lon) {
-            try {
-                const r = await fetch(`${API.dvf}?lat=${lat}&lon=${lon}&radius=5`);
-                state.data.dvf = await r.json();
-            } catch (e) { state.data.dvf = { error: e.message }; }
-        }
-        
-        async function fetchRisques(lat, lon, code) {
-            try {
-                const r = await fetch(`${API.risques}?lat=${lat}&lon=${lon}&code_insee=${code}`);
-                state.data.risques = await r.json();
-            } catch (e) { state.data.risques = { error: e.message }; }
-        }
-        
-        async function fetchCadastre(lat, lon) {
-            try {
-                const r = await fetch(`${API.cadastre}?lat=${lat}&lon=${lon}`);
-                state.data.cadastre = await r.json();
-            } catch (e) { state.data.cadastre = { error: e.message }; }
-        }
-        
-        async function fetchUrbanisme(lat, lon) {
-            try {
-                const r = await fetch(`${API.urbanisme}?lat=${lat}&lon=${lon}`);
-                state.data.urbanisme = await r.json();
-            } catch (e) { state.data.urbanisme = { error: e.message }; }
-        }
-        
-        // ================================
-        // RENDER FUNCTIONS
-        // ================================
-        function renderSuggestions(features) {
-            els.suggestions.innerHTML = features.map(f => `
-                <li data-feature='${JSON.stringify(f).replace(/'/g, "&#39;")}'>
-                    <span class="name">📍 ${f.properties.name}</span>
-                    <span class="city">${f.properties.postcode} ${f.properties.city}</span>
-                </li>
-            `).join('');
-            els.suggestions.classList.add('active');
-        }
-        
-        function renderOfficialLinks() {
-            const [lon, lat] = state.location.geometry.coordinates;
-            const code = state.location.properties.citycode;
-            const links = [
-                { label: "Georisques — Alle risico's", url: `https://georisques.gouv.fr/mes-risques/connaitre-les-risques-pres-de-chez-moi/rapport?form-commune=true&codeInsee=${code}`, icon: '🌊' },
-                { label: 'DVF Explorer — Transacties', url: `https://explore.data.gouv.fr/immobilier?onglet=carte&lat=${lat}&lon=${lon}&zoom=16`, icon: '💶' },
-                { label: 'Géoportail Urbanisme — PLU', url: 'https://www.geoportail-urbanisme.gouv.fr/map/', icon: '🗺️' },
-                { label: 'ARCEP — Internetdekking', url: `https://maconnexioninternet.arcep.fr/?lat=${lat}&lon=${lon}&zoom=16`, icon: '📶' },
-                { label: 'France Rénov — Energielabel', url: 'https://france-renov.gouv.fr/', icon: '🏷️' },
-                { label: 'Cadastre — Perceelkaart', url: 'https://www.cadastre.gouv.fr/scpc/rechercherPlan.do', icon: '📐' },
-            ];
-            document.getElementById('officialLinks').innerHTML = links.map(l => `
-                <a href="${l.url}" target="_blank" rel="noopener" class="ifr-link">
-                    <span class="icon">${l.icon}</span><span class="label">${l.label}</span><span class="arrow">→</span>
-                </a>
-            `).join('');
-        }
-        
-        function renderKPIs() {
-            const txs = state.data.dvf?.transactions || [];
-            const prices = txs.filter(t => t.prix && t.surface).map(t => t.prix / t.surface);
-            const avg = prices.length ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : null;
-            
-            document.getElementById('kpiAvgPrice').textContent = avg ? `€${avg.toLocaleString('nl-NL')}` : '—';
-            document.getElementById('kpiCount').textContent = txs.length;
-            
-            const r = state.data.risques;
-            let riskText = '✓ Beperkt', riskColor = '#2e7d32';
-            if (r?.argiles?.niveau === 'fort') { riskText = '⚠️ Klei krimp-zwelling'; riskColor = '#c62828'; }
-            else if (r?.radon?.niveau === 'fort') { riskText = '☢️ Radon cat. 3'; riskColor = '#c62828'; }
-            else if (r?.industriel?.seveso) { riskText = '🏭 SEVESO nabij'; riskColor = '#c62828'; }
-            
-            const kpiRisk = document.getElementById('kpiRisk');
-            kpiRisk.textContent = riskText;
-            kpiRisk.style.color = riskColor;
-            
-            const plu = state.data.urbanisme?.features?.[0]?.properties;
-            document.getElementById('kpiPLU').textContent = plu?.libelle || plu?.typezone || '—';
-        }
-        
-        function renderTransacties() {
-            const c = document.getElementById('transactiesContent');
-            const txs = state.data.dvf?.transactions || [];
-            
-            if (!txs.length) {
-                c.innerHTML = `
-                    <div class="ifr-empty">
-                        <div class="ifr-empty-icon">📭</div>
-                        <p>Geen transacties gevonden binnen 5km in 2025</p>
-                        <p style="font-size: 13px; margin-top: 12px;">Probeer de officiële DVF Explorer voor historische data:</p>
-                        <a href="https://explore.data.gouv.fr/immobilier" target="_blank" class="ifr-btn" style="margin-top: 12px;">Open DVF Explorer →</a>
-                    </div>
+      });
+    });
+
+    // =============================
+    // BAN Search
+    // =============================
+    const q = document.getElementById('q');
+    const suggestions = document.getElementById('suggestions');
+    const btnSearch = document.getElementById('btnSearch');
+
+    async function searchBAN(query) {
+      const r = await fetch(`${API.ban}/search/?q=${encodeURIComponent(query)}&limit=6`);
+      const j = await r.json();
+      return j.features || [];
+    }
+
+    function renderSuggestions(features) {
+      if (!features.length) {
+        suggestions.innerHTML = `<div style="padding:10px 0;color:var(--text-muted)">Geen resultaten.</div>`;
+        return;
+      }
+      suggestions.innerHTML = `
+        <div style="display:grid;gap:8px;margin-top:8px">
+          ${features.map(f => `
+            <button class="ifr-btn" style="text-align:left;background:#fff;color:var(--text);border:1px solid var(--border);font-weight:600"
+              onclick='selectAddress(${JSON.stringify(f).replace(/'/g,"&#39;")})'>
+              ${f.properties.label}
+              <div style="font-size:12px;color:var(--text-muted);font-weight:400">INSEE: ${f.properties.citycode || '—'} • Score: ${Math.round((f.properties.score||0)*100)/100}</div>
+            </button>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    const doSuggest = debounce(async () => {
+      const v = q.value.trim();
+      if (v.length < 5) { suggestions.innerHTML = ''; return; }
+      try{
+        const features = await searchBAN(v);
+        renderSuggestions(features);
+      }catch(e){
+        suggestions.innerHTML = `<div style="padding:10px 0;color:var(--text-muted)">Zoeken mislukt. Probeer opnieuw.</div>`;
+      }
+    }, 250);
+
+    q.addEventListener('input', doSuggest);
+    btnSearch.addEventListener('click', async () => {
+      const v = q.value.trim();
+      if (v.length < 5) return;
+      const features = await searchBAN(v);
+      renderSuggestions(features);
+    });
+
+    window.selectAddress = async function(f){
+      state.location = f;
+      suggestions.innerHTML = '';
+      q.value = f.properties.label;
+
+      await fetchAllForLocation();
+      renderOverzicht();
+    }
+
+    // =============================
+    // Fetch data
+    // =============================
+    async function fetchAllForLocation(){
+      const [lon, lat] = state.location.geometry.coordinates;
+      const code_insee = state.location.properties.citycode;
+
+      ['kpiTx','kpiAvgPrice','kpiRisk','kpiPLU'].forEach(id => document.getElementById(id).textContent = '...');
+
+      await Promise.all([
+        fetchDVF(lat, lon),
+        fetchRisques(lat, lon, code_insee),
+        fetchCadastre(lat, lon),
+        fetchUrbanisme(lat, lon),
+        fetchDPE(lat, lon)
+      ]);
+
+      updateKPIs();
+    }
+
+    async function fetchDVF(lat, lon) {
+      try {
+        const r = await fetch(`${API.dvf}?lat=${lat}&lon=${lon}&radius=${DVF_RADIUS_KM}`);
+        state.data.dvf = await r.json();
+      } catch (e) {
+        state.data.dvf = { transactions: [], error: true };
+      }
+    }
+
+    async function fetchRisques(lat, lon, code_insee) {
+      try {
+        const r = await fetch(`${API.risques}?lat=${lat}&lon=${lon}&code_insee=${code_insee}`);
+        state.data.risques = await r.json();
+      } catch (e) {
+        state.data.risques = { error: true };
+      }
+    }
+
+    async function fetchCadastre(lat, lon) {
+      try {
+        const r = await fetch(`${API.cadastre}?lat=${lat}&lon=${lon}`);
+        state.data.cadastre = await r.json();
+      } catch (e) {
+        state.data.cadastre = { error: true };
+      }
+    }
+
+    async function fetchUrbanisme(lat, lon) {
+      try {
+        const r = await fetch(`${API.urbanisme}?lat=${lat}&lon=${lon}`);
+        state.data.urbanisme = await r.json();
+      } catch (e) {
+        state.data.urbanisme = { error: true };
+      }
+    }
+
+    async function fetchDPE(lat, lon) {
+      try {
+        const r = await fetch(`${API.dpe}?lat=${lat}&lon=${lon}`);
+        state.data.dpe = await r.json();
+      } catch (e) {
+        state.data.dpe = { error: true };
+      }
+    }
+
+    // =============================
+    // KPIs
+    // =============================
+    function updateKPIs(){
+      const txs = state.data.dvf?.transactions || [];
+      document.getElementById('kpiTx').textContent = txs.length ? String(txs.length) : '0';
+
+      const woningen = txs.filter(t => t.surface && (t.type === 'Maison' || t.type === 'Appartement'));
+      const avg = woningen.length ? Math.round(woningen.reduce((s,t)=> s + (t.prix / t.surface), 0) / woningen.length) : null;
+      document.getElementById('kpiAvgPrice').textContent = avg ? `${avg.toLocaleString('nl-NL')} €` : '—';
+
+      const risques = state.data.risques || {};
+      const rCount = ['inondation','seisme','radon','argile','seveso'].filter(k => risques[k]).length;
+      document.getElementById('kpiRisk').textContent = rCount ? String(rCount) : '—';
+
+      const plu = state.data.urbanisme?.plu?.url || state.data.urbanisme?.gpu?.url;
+      document.getElementById('kpiPLU').textContent = plu ? 'Ja' : '—';
+    }
+
+    // =============================
+    // Render Overzicht
+    // =============================
+    function renderOverzicht() {
+      const c = document.getElementById('overzichtContent');
+      const f = state.location;
+
+      const [lon, lat] = f.geometry.coordinates;
+      const code_insee = f.properties.citycode || '';
+      const commune = f.properties.city || '';
+      const postcode = f.properties.postcode || '';
+
+      const txs = state.data.dvf?.transactions || [];
+      const avgM2 = (() => {
+        const woningen = txs.filter(t => t.surface && (t.type === 'Maison' || t.type === 'Appartement'));
+        if(!woningen.length) return null;
+        return Math.round(woningen.reduce((s,t)=> s + (t.prix / t.surface), 0) / woningen.length);
+      })();
+
+      const links = [
+        { label: 'GéoRisques — kaart & rapport', url: `https://www.georisques.gouv.fr/`, icon: '⚠️' },
+        { label: 'Cadastre — kaart', url: `https://www.cadastre.gouv.fr/scpc/rechercherPlan.do`, icon: '🗺️' },
+        { label: 'Géoportail Urbanisme — PLU', url: `https://www.geoportail-urbanisme.gouv.fr/map/#/center/${lon}/${lat}/zoom/17`, icon: '🏛️' },
+        { label: 'DVF Explorer — Transacties', url: `https://explore.data.gouv.fr/immobilier?onglet=carte&lat=${lat}&lon=${lon}&zoom=16`, icon: '💶' },
+        { label: 'Observatoire DPE-AUDIT (ADEME)', url: `https://observatoire-dpe-audit.ademe.fr/`, icon: '🏷️' },
+        { label: 'ARCEP — Ma Connexion Internet', url: `https://maconnexioninternet.arcep.fr/?lat=${lat}&lon=${lon}&zoom=17`, icon: '📶' }
+      ];
+
+      c.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div style="padding:18px;border:1px solid var(--border);border-radius:14px;background:#fff">
+            <h3 style="margin:0 0 10px;font-size:15px">📍 Adres</h3>
+            <div style="font-family:monospace;background:var(--bg);padding:12px;border-radius:10px;border:1px solid var(--border);user-select:all">${f.properties.label}</div>
+            <div style="margin-top:10px;font-size:13px;color:var(--text-muted)">
+              Commune: <strong>${commune}</strong> • Postcode: <strong>${postcode}</strong> • INSEE: <strong>${code_insee}</strong><br>
+              Coördinaten: <strong>${lat.toFixed(6)}, ${lon.toFixed(6)}</strong>
+            </div>
+          </div>
+
+          <div style="padding:18px;border:1px solid var(--border);border-radius:14px;background:#fff">
+            <h3 style="margin:0 0 10px;font-size:15px">📊 Snelle duiding</h3>
+            <ul style="margin:0;padding-left:18px;font-size:13px">
+              <li>DVF (2025): <strong>${txs.length}</strong> transacties binnen ${DVF_RADIUS_KM}km (${DVF_SOURCE_NOTE}).</li>
+              <li>Gemiddeld (woningen met m²): <strong>${avgM2 ? avgM2.toLocaleString('nl-NL') + ' €/m²' : '—'}</strong> (indicatief).</li>
+              <li>Risico’s: kijk naar de tab “Risico’s” voor radon/klei/inondation/seismisch/SEVESO.</li>
+              <li>PLU/GPU: check tab “Kadaster” voor planologische bronlinks.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div style="margin-top:16px;padding:16px;border-radius:14px;background:var(--bg);border:1px solid var(--border)">
+          <h3 style="margin:0 0 10px;font-size:15px">🔗 Direct naar officiële bronnen</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px">
+            ${links.map(l => `
+              <a href="${l.url}" target="_blank" class="ifr-btn" style="background:#fff;color:var(--text);border:1px solid var(--border);font-weight:700;text-decoration:none;display:flex;align-items:center;gap:10px;justify-content:flex-start">
+                <span style="font-size:18px">${l.icon}</span>
+                <span style="line-height:1.3em">${l.label}</span>
+              </a>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    // =============================
+    // Render Transacties
+    // =============================
+    function renderTransacties() {
+      const c = document.getElementById('transactiesContent');
+      const txs = state.data.dvf?.transactions || [];
+
+      if (!txs.length) {
+        c.innerHTML = `
+          <div class="ifr-empty">
+            <div class="ifr-empty-icon">📭</div>
+            <p>Geen transacties gevonden binnen ${DVF_RADIUS_KM}km in ${DVF_YEAR}</p>
+            <div class="infoBox" style="max-width:700px;margin:14px auto 0">
+              <div class="infoIcon">i</div>
+              <div>
+                <p><strong>Beperking:</strong> ${DVF_SOURCE_NOTE}. In landelijke gebieden kan dit overzicht onvolledig zijn.</p>
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      const woningen = txs.filter(t => t.surface && (t.type === 'Maison' || t.type === 'Appartement'));
+
+      c.innerHTML = `
+        <div class="infoBox" style="margin-top:12px">
+          <div class="infoIcon">i</div>
+          <div>
+            <p><strong>${txs.length}</strong> transacties (${DVF_YEAR}); <strong>${woningen.length}</strong> woningen met oppervlakte. <span style="color:var(--text-muted)">${DVF_SOURCE_NOTE}.</span></p>
+          </div>
+        </div>
+
+        <div style="overflow:auto;border:1px solid var(--border);border-radius:12px">
+          <table class="ifr-table">
+            <thead>
+              <tr>
+                <th>Datum</th>
+                <th>Type</th>
+                <th class="right">Prijs</th>
+                <th class="right">m²</th>
+                <th class="right">€/m²</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${txs.slice(0, 25).map(t => {
+                const ppm2 = t.surface ? Math.round(t.prix / t.surface) : null;
+                const d = t.date ? new Date(t.date) : null;
+                const dStr = d ? d.toLocaleDateString('nl-NL') : '—';
+                return `
+                  <tr>
+                    <td>${dStr}</td>
+                    <td><span class="badge">${t.type || '—'}</span></td>
+                    <td class="right"><strong>${(t.prix || 0).toLocaleString('nl-NL')} €</strong></td>
+                    <td class="right">${t.surface ? t.surface : '—'}</td>
+                    <td class="right">${ppm2 ? ppm2.toLocaleString('nl-NL') : '—'}</td>
+                  </tr>
                 `;
-                return;
-            }
-            
-            const woningen = txs.filter(t => t.surface && (t.type === 'Maison' || t.type === 'Appartement'));
-            
-            c.innerHTML = `
-                <div style="margin-bottom:16px;padding:12px 16px;background:var(--bg);border-radius:8px;font-size:13px">
-                    <strong>${txs.length}</strong> transacties gevonden (2025) — waarvan <strong>${woningen.length}</strong> woningen met oppervlakte
-                </div>
-                <table class="ifr-table">
-                    <thead>
-                        <tr>
-                            <th>Datum</th>
-                            <th>Type</th>
-                            <th>Adres</th>
-                            <th class="right">Prijs</th>
-                            <th class="right">m²</th>
-                            <th class="right">€/m²</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${txs.slice(0, 25).map(t => {
-                            const ppm2 = t.surface ? Math.round(t.prix / t.surface) : null;
-                            const typeClass = t.type === 'Maison' ? 'maison' : (t.type === 'Appartement' ? 'appartement' : '');
-                            return `<tr>
-                                <td>${formatDate(t.date)}</td>
-                                <td><span class="ifr-type-badge ${typeClass}">${t.type || '—'}</span></td>
-                                <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${t.adresse || ''}">${t.adresse || '—'}</td>
-                                <td class="right price">${formatPrice(t.prix)}</td>
-                                <td class="right">${t.surface || '—'}</td>
-                                <td class="right ppm2">${ppm2 ? '€' + ppm2.toLocaleString('nl-NL') : '—'}</td>
-                            </tr>`;
-                        }).join('')}
-                    </tbody>
-                </table>
-                ${txs.length > 25 ? `<p style="margin-top:12px;font-size:13px;color:var(--text-muted)">Toont 25 van ${txs.length} transacties</p>` : ''}
-            `;
-        }
-        
-        function renderRisicos() {
-            const c = document.getElementById('riskGrid');
-            const r = state.data.risques || {};
-            const adres = state.location?.properties?.label || '';
-            const codeInsee = state.location?.properties?.citycode || '';
-            
-            // Check of we fallback status hebben
-            if (r.status === 'fallback' || !r.seisme?.zone) {
-                c.innerHTML = `
-                    <div style="grid-column: 1 / -1;">
-                        <div style="background: var(--bg); border-radius: 12px; padding: 24px; margin-bottom: 20px;">
-                            <h3 style="margin: 0 0 8px; color: var(--primary); font-size: 16px;">📍 Geselecteerd adres</h3>
-                            <div style="font-family: monospace; background: var(--white); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border); user-select: all; font-size: 14px;">${adres}</div>
-                            <p style="margin: 8px 0 0; font-size: 12px; color: var(--text-muted);">Kopieer dit adres voor onderstaande tools</p>
-                        </div>
-                        
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                            <div style="background: var(--white); border: 2px solid var(--primary); border-radius: 12px; padding: 24px;">
-                                <div style="font-size: 32px; margin-bottom: 12px;">📋</div>
-                                <h4 style="margin: 0 0 8px; color: var(--primary);">Officieel Risico-rapport</h4>
-                                <p style="font-size: 13px; color: var(--text-muted); margin: 0 0 16px;">Bekijk alle bekende risico's voor deze gemeente: overstromingen, aardbevingen, radon, industrieel, etc.</p>
-                                <a href="https://georisques.gouv.fr/mes-risques/connaitre-les-risques-pres-de-chez-moi/rapport?form-commune=true&codeInsee=${codeInsee}" target="_blank" class="ifr-btn" style="display: block; text-align: center;">
-                                    Open rapport →
-                                </a>
-                            </div>
-                            
-                            <div style="background: var(--white); border: 2px solid var(--border); border-radius: 12px; padding: 24px;">
-                                <div style="font-size: 32px; margin-bottom: 12px;">📄</div>
-                                <h4 style="margin: 0 0 8px; color: var(--primary);">ERP Generator (État des Risques)</h4>
-                                <p style="font-size: 13px; color: var(--text-muted); margin: 0 0 12px;">Genereer het wettelijk verplichte risico-document voor koop/huur.</p>
-                                <div style="background: #fff3cd; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 12px;">
-                                    <strong>Instructies:</strong>
-                                    <ol style="margin: 8px 0 0; padding-left: 20px; line-height: 1.6;">
-                                        <li>Klik op de knop hieronder</li>
-                                        <li>Plak het adres in "Adresse complète"</li>
-                                        <li>Klik "Afficher les risques"</li>
-                                        <li>Vul gegevens in en download PDF</li>
-                                    </ol>
-                                </div>
-                                <a href="https://errial.georisques.gouv.fr/" target="_blank" class="ifr-btn" style="display: block; text-align: center; background: var(--text);">
-                                    Open ERP tool →
-                                </a>
-                            </div>
-                        </div>
-                        
-                        <div style="margin-top: 20px; padding: 16px; background: var(--primary); border-radius: 10px; color: var(--white); font-size: 13px;">
-                            <strong>📋 Wettelijke verplichting:</strong> Bij verkoop of verhuur moet een 
-                            <em>État des Risques et Pollutions</em> (ERP) worden verstrekt, maximaal 6 maanden oud. 
-                            De verkoper/verhuurder is verantwoordelijk voor dit document.
-                        </div>
-                    </div>
-                `;
-                return;
-            }
-            
-            const risks = [
-                { icon: '🏚️', title: 'Klei krimp-zwelling', sub: 'Argiles', niveau: r.argiles?.niveau, detail: r.argiles?.alea || 'Geen data', alert: r.argiles?.niveau === 'fort', warn: r.argiles?.niveau === 'fort' ? '⚠️ Geotechnische studie verplicht' : null },
-                { icon: '🫨', title: 'Seismisch risico', sub: 'Séisme', niveau: r.seisme?.niveau, detail: `Zone ${r.seisme?.zone || '—'} (1-5)` },
-                { icon: '☢️', title: 'Radon', sub: 'Gaz radioactif', niveau: r.radon?.niveau, detail: `Categorie ${r.radon?.categorie || '—'} (1-3)`, warn: r.radon?.categorie >= 2 ? 'Radonmeting aanbevolen' : null },
-                { icon: '🌊', title: 'Overstromingsrisico', sub: 'Inondation', niveau: r.inondation?.niveau, detail: r.inondation?.details?.[0] || 'Geen specifiek risico' },
-                { icon: '🏭', title: 'Industrieel risico', sub: 'SEVESO/ICPE', niveau: r.industriel?.seveso ? 'fort' : (r.industriel?.icpe_count > 0 ? 'moyen' : 'faible'), detail: r.industriel?.seveso ? 'SEVESO-site nabij!' : `${r.industriel?.icpe_count || 0} ICPE` },
-                { icon: '🕳️', title: 'Ondergrondse holtes', sub: 'Cavités', niveau: r.cavites?.count > 0 ? 'moyen' : 'faible', detail: `${r.cavites?.count || 0} binnen 500m` },
-                { icon: '⚗️', title: 'Bodemverontreiniging', sub: 'BASOL/SIS', niveau: r.pollution?.count > 0 ? 'moyen' : 'faible', detail: `${r.pollution?.count || 0} site(s)` }
-            ];
-            
-            c.innerHTML = risks.map(x => `
-                <div class="ifr-risk-card ${x.alert ? 'alert' : ''}">
-                    <div class="ifr-risk-header">
-                        <span class="ifr-risk-icon">${x.icon}</span>
-                        <div><h4 class="ifr-risk-title">${x.title}</h4><span class="ifr-risk-subtitle">${x.sub}</span></div>
-                        <span class="ifr-risk-badge ${getRiskClass(x.niveau || 'inconnu')}">${getRiskLabel(x.niveau || 'inconnu')}</span>
-                    </div>
-                    <p style="margin:0;font-size:13px;color:#555">${x.detail}</p>
-                    ${x.warn ? `<p style="margin:12px 0 0;font-size:12px;color:#c62828;font-weight:600">${x.warn}</p>` : ''}
-                </div>
-            `).join('');
-        }
-        
-        function renderKadaster() {
-            const c = document.getElementById('kadasterContent');
-            const cad = state.data.cadastre || {};
-            const urb = state.data.urbanisme || {};
-            const p = cad.parcelle?.features?.[0]?.properties;
-            const com = cad.commune?.[0];
-            const plu = urb.features?.[0]?.properties;
-            
-            c.innerHTML = `
-                <div class="ifr-kpi-grid">
-                    <div class="ifr-kpi"><div class="ifr-kpi-label">Parcelle</div><div class="ifr-kpi-value" style="font-size:20px">${p?.numero || '—'}</div></div>
-                    <div class="ifr-kpi"><div class="ifr-kpi-label">Section</div><div class="ifr-kpi-value" style="font-size:20px">${p?.section || '—'}</div></div>
-                    <div class="ifr-kpi"><div class="ifr-kpi-label">Oppervlakte</div><div class="ifr-kpi-value" style="font-size:20px">${p?.contenance ? p.contenance + ' m²' : '—'}</div></div>
-                    <div class="ifr-kpi"><div class="ifr-kpi-label">Gemeente</div><div class="ifr-kpi-value" style="font-size:16px">${com?.nom || '—'}</div><div class="ifr-kpi-note">${com?.population ? com.population.toLocaleString() + ' inwoners' : ''}</div></div>
-                </div>
-                <h3>Bestemmingsplan (PLU)</h3>
-                ${plu ? `<div style="padding:20px;background:#fff;border:2px solid #800000;border-radius:10px">
-                    <div style="font-size:18px;font-weight:600;margin-bottom:8px">${plu.libelle || plu.typezone || 'Zone'}</div>
-                    ${plu.destdomi ? `<p style="margin:0;font-size:14px;color:#555">Bestemming: ${plu.destdomi}</p>` : ''}
-                </div>` : `<div style="padding:20px;background:#faf8f5;border-radius:10px;color:#666">
-                    PLU-data niet beschikbaar. Zie <a href="https://www.geoportail-urbanisme.gouv.fr/map/" target="_blank" style="color:#800000">Géoportail Urbanisme</a>.
-                </div>`}
-            `;
-        }
-        
-        function renderEnergie() {
-            const [lon, lat] = state.location.geometry.coordinates;
-            const adres = state.location?.properties?.label || '';
-            
-            document.getElementById('energieContent').innerHTML = `
-                <div style="background: var(--bg); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-                    <h3 style="margin: 0 0 8px; color: var(--primary); font-size: 16px;">📍 Geselecteerd adres</h3>
-                    <div style="font-family: monospace; background: var(--white); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border); user-select: all; font-size: 14px;">${adres}</div>
-                </div>
-                
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px">
-                    <div style="padding:24px;border-radius:12px;border:2px solid var(--primary);background:#fff">
-                        <h3 style="margin:0 0 16px;font-size:15px;color:var(--primary)">🏷️ Energielabel (DPE)</h3>
-                        <div style="display:flex;gap:3px;margin-bottom:16px">
-                            ${['A','B','C','D','E','F','G'].map((l,i) => `<div style="flex:1;padding:10px 0;text-align:center;font-weight:700;font-size:13px;border-radius:4px;background:${['#2e7d32','#558b2f','#9e9d24','#f9a825','#ef6c00','#d84315','#b71c1c'][i]};color:#fff;opacity:0.5">${l}</div>`).join('')}
-                        </div>
-                        <p style="margin:0 0 12px;font-size:13px;color:#666">DPE-label staat in verkoopadvertentie. Sinds 2025: F/G niet meer verhuurbaar.</p>
-                        <a href="https://observatoire-dpe.ademe.fr/rechercher" target="_blank" class="ifr-btn" style="display:block;text-align:center;margin-bottom:8px">Zoek DPE in database →</a>
-                        <a href="https://france-renov.gouv.fr/" target="_blank" style="display:block;text-align:center;color:#800000;font-weight:600;font-size:13px">Check renovatiepremies →</a>
-                    </div>
-                    <div style="padding:24px;border-radius:12px;border:1px solid #e0d6cc;background:#fff">
-                        <h3 style="margin:0 0 16px;font-size:15px;color:var(--primary)">📶 Internetdekking</h3>
-                        <p style="margin:0 0 16px;font-size:13px;color:#666">Check glasvezel & mobiel bereik via ARCEP:</p>
-                        <a href="https://maconnexioninternet.arcep.fr/?lat=${lat}&lon=${lon}&zoom=17" target="_blank" class="ifr-btn" style="display:block;text-align:center">Open ARCEP kaart →</a>
-                    </div>
-                </div>
-                
-                <div style="margin-top:20px;padding:16px;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;font-size:13px">
-                    <strong>💡 Tip:</strong> Vraag altijd de originele DPE-rapportage op bij de verkoper. 
-                    Let op de datum — een DPE is 10 jaar geldig, maar oudere DPE's (vóór 2021) kunnen afwijken van de huidige methodiek.
-                </div>
-            `;
-        }
-        
-        // ================================
-        // MAIN
-        // ================================
-        async function selectLocation(f) {
-            state.location = f;
-            els.suggestions.classList.remove('active');
-            els.search.value = f.properties.label;
-            els.tabs.style.display = 'flex';
-            
-            document.getElementById('panelIntro').classList.remove('active');
-            showTab('overzicht');
-            document.getElementById('selectedAddress').textContent = f.properties.label;
-            
-            ['kpiAvgPrice','kpiCount','kpiRisk','kpiPLU'].forEach(id => document.getElementById(id).textContent = '...');
-            
-            const [lon, lat] = f.geometry.coordinates;
-            const code = f.properties.citycode;
-            
-            await Promise.all([
-                fetchDVF(lat, lon),
-                fetchRisques(lat, lon, code),
-                fetchCadastre(lat, lon),
-                fetchUrbanisme(lat, lon)
-            ]);
-            
-            renderOfficialLinks();
-            renderKPIs();
-            renderTransacties();
-            renderRisicos();
-            renderKadaster();
-            renderEnergie();
-        }
-        
-        function showTab(id) {
-            document.querySelectorAll('.ifr-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === id));
-            document.querySelectorAll('.ifr-content').forEach(p => p.classList.remove('active'));
-            const panel = document.getElementById('panel' + id.charAt(0).toUpperCase() + id.slice(1));
-            if (panel) panel.classList.add('active');
-        }
-        
-        // ================================
-        // EVENTS
-        // ================================
-        els.search.addEventListener('input', debounce(e => {
-            if (!state.location || e.target.value !== state.location.properties.label) {
-                state.location = null;
-                searchAddress(e.target.value);
-            }
-        }, 300));
-        
-        els.suggestions.addEventListener('click', e => {
-            const li = e.target.closest('li');
-            if (li?.dataset.feature) selectLocation(JSON.parse(li.dataset.feature));
-        });
-        
-        els.tabs.addEventListener('click', e => {
-            const tab = e.target.closest('.ifr-tab');
-            if (tab?.dataset.tab) showTab(tab.dataset.tab);
-        });
-        
-        document.addEventListener('click', e => {
-            if (!e.target.closest('.ifr-search-box')) els.suggestions.classList.remove('active');
-        });
-    })();
-    </script>
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        ${txs.length > 25 ? `<p style="margin-top:12px;font-size:12px;color:var(--text-muted)">Toont 25 van ${txs.length} transacties</p>` : ''}
+      `;
+    }
+
+    // =============================
+    // Render Risico’s
+    // =============================
+    function renderRisicos(){
+      const c = document.getElementById('risicosContent');
+      const r = state.data.risques;
+
+      if(!r || r.error){
+        c.innerHTML = `
+          <div class="ifr-empty">
+            <div class="ifr-empty-icon">⚠️</div>
+            <p>Risico-data niet beschikbaar (API fout of limiet).</p>
+            <a href="https://www.georisques.gouv.fr/" target="_blank" class="ifr-btn" style="margin-top:12px">Open GéoRisques →</a>
+          </div>
+        `;
+        return;
+      }
+
+      const items = [
+        { key:'inondation', label:'Overstroming', val:r.inondation },
+        { key:'seisme', label:'Seismisch', val:r.seisme },
+        { key:'radon', label:'Radon', val:r.radon },
+        { key:'argile', label:'Klei (RGA)', val:r.argile },
+        { key:'seveso', label:'SEVESO', val:r.seveso }
+      ].filter(x => x.val);
+
+      if(!items.length){
+        c.innerHTML = `
+          <div class="ifr-empty">
+            <div class="ifr-empty-icon">✅</div>
+            <p>Geen risico-indicatoren teruggekregen voor dit punt.</p>
+            <a href="https://www.georisques.gouv.fr/" target="_blank" class="ifr-btn" style="margin-top:12px">Check op kaart →</a>
+          </div>
+        `;
+        return;
+      }
+
+      c.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:12px">
+          ${items.map(it => `
+            <div style="padding:16px;border:1px solid var(--border);border-radius:14px;background:#fff">
+              <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+                <strong>${it.label}</strong>
+                <span class="risk-pill ${getRiskClass(it.val.niveau || it.val.level || it.val)}">${(it.val.niveau || it.val.level || it.val || '—')}</span>
+              </div>
+              <div style="margin-top:8px;font-size:13px;color:var(--text-muted)">
+                ${it.val.detail || it.val.description || 'Zie officiële bron voor details.'}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div style="margin-top:16px">
+          <a class="ifr-btn" target="_blank" href="https://www.georisques.gouv.fr/" style="text-decoration:none">Open GéoRisques →</a>
+        </div>
+      `;
+    }
+
+    // =============================
+    // Render Kadaster
+    // =============================
+    function renderKadaster(){
+      const c = document.getElementById('kadasterContent');
+      const cad = state.data.cadastre;
+      const urb = state.data.urbanisme;
+
+      const [lon, lat] = state.location.geometry.coordinates;
+
+      c.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:12px">
+          <div style="padding:18px;border:1px solid var(--border);border-radius:14px;background:#fff">
+            <h3 style="margin:0 0 10px;font-size:15px;color:var(--primary)">🗺️ Kadaster (IGN API Carto)</h3>
+            ${(!cad || cad.error) ? `
+              <div style="color:var(--text-muted);font-size:13px">Kadasterdata niet beschikbaar.</div>
+            ` : `
+              <div style="font-size:13px;color:var(--text-muted)">
+                Commune: <strong>${cad.commune || '—'}</strong><br>
+                INSEE: <strong>${cad.insee || '—'}</strong><br>
+                Section: <strong>${cad.section || '—'}</strong><br>
+                Parcel(en): <strong>${(cad.parcelles || []).join(', ') || '—'}</strong>
+              </div>
+            `}
+            <a href="https://www.cadastre.gouv.fr/scpc/rechercherPlan.do" target="_blank" class="ifr-btn" style="margin-top:12px;text-decoration:none;display:inline-block">Open kadaster →</a>
+          </div>
+
+          <div style="padding:18px;border:1px solid var(--border);border-radius:14px;background:#fff">
+            <h3 style="margin:0 0 10px;font-size:15px;color:var(--primary)">🏛️ PLU / GPU</h3>
+            ${(!urb || urb.error) ? `
+              <div style="color:var(--text-muted);font-size:13px">Urbanisme-data niet beschikbaar.</div>
+            ` : `
+              <div style="font-size:13px;color:var(--text-muted)">
+                ${urb.plu?.url ? `PLU-link: <a href="${urb.plu.url}" target="_blank">open</a><br>` : ''}
+                ${urb.gpu?.url ? `GPU-link: <a href="${urb.gpu.url}" target="_blank">open</a><br>` : ''}
+                ${(!urb.plu?.url && !urb.gpu?.url) ? 'Geen PLU/GPU-link teruggekregen (niet alle gemeenten hebben dekking via API).' : ''}
+              </div>
+            `}
+            <a href="https://www.geoportail-urbanisme.gouv.fr/map/#/center/${lon}/${lat}/zoom/17" target="_blank" class="ifr-btn" style="margin-top:12px;text-decoration:none;display:inline-block">Open GPU kaart →</a>
+          </div>
+        </div>
+      `;
+    }
+
+    // =============================
+    // Render Energie
+    // =============================
+    function renderEnergie() {
+      const [lon, lat] = state.location.geometry.coordinates;
+      const adres = state.location?.properties?.label || '';
+
+      // Correcte links (Observatoire DPE-AUDIT + Service-Public ingang)
+      const ADEME_OBS = "https://observatoire-dpe-audit.ademe.fr/";
+      const SERVICE_PUBLIC_DPE = "https://www.service-public.gouv.fr/particuliers/vosdroits/R67366";
+
+      document.getElementById('energieContent').innerHTML = `
+        <div style="background: var(--bg); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+          <h3 style="margin: 0 0 8px; color: var(--primary); font-size: 16px;">📍 Geselecteerd adres</h3>
+          <div style="font-family: monospace; background: #fff; padding: 12px; border-radius: 10px; border: 1px solid var(--border); user-select: all; font-size: 14px;">${adres}</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px">
+          <div style="padding:24px;border-radius:12px;border:2px solid var(--primary);background:#fff">
+            <h3 style="margin:0 0 16px;font-size:15px;color:var(--primary)">🏷️ Energielabel (DPE)</h3>
+
+            <div style="display:flex;gap:3px;margin-bottom:16px">
+              ${['A','B','C','D','E','F','G'].map((l,i)=>`<div style="flex:1;text-align:center;padding:6px 0;border-radius:6px;font-weight:800;background:${['#1b5e20','#2e7d32','#558b2f','#9e9d24','#f9a825','#ef6c00','#b71c1c'][i]};color:#fff;opacity:0.5">${l}</div>`).join('')}
+            </div>
+
+            <div class="infoBox">
+              <div class="infoIcon">i</div>
+              <div>
+                <p><strong>Belangrijk:</strong> dit dashboard toont <strong>context</strong>. De exacte DPE van een pand staat in het officiële DPE-rapport van de verkoper.</p>
+              </div>
+            </div>
+
+            <div class="infoBox">
+              <div class="infoIcon">i</div>
+              <div>
+                <p><strong>Juridisch effect (DPE):</strong> vooral relevant voor <strong>verhuur</strong>.</p>
+                <p>Label <strong>G</strong> verboden sinds <strong>01-01-2025</strong>; <strong>F</strong> vanaf <strong>01-01-2028</strong>; <strong>E</strong> vanaf <strong>01-01-2034</strong>.</p>
+                <p><strong>Verkoop</strong> van F/G blijft toegestaan; wél kan een <em>audit énergétique</em> verplicht zijn en speelt renovatie mee in de prijs.</p>
+              </div>
+            </div>
+
+            <a href="${ADEME_OBS}" target="_blank" class="ifr-btn" style="width:100%;text-decoration:none;display:block;text-align:center;margin-bottom:8px">Observatoire DPE-AUDIT (ADEME) →</a>
+            <a href="${SERVICE_PUBLIC_DPE}" target="_blank" class="ifr-btn" style="width:100%;text-decoration:none;display:block;text-align:center;background:#fff;color:#800000;border:1px solid #800000;font-weight:700;font-size:13px">Service-Public: DPE verifiëren/attestation →</a>
+
+            <a href="https://france-renov.gouv.fr/" target="_blank" class="ifr-btn" style="width:100%;text-decoration:none;display:block;text-align:center;margin-top:10px;background:#fff;color:#800000;border:1px solid #800000;font-weight:700;font-size:13px">Renovatiepremies (France Rénov’) →</a>
+          </div>
+
+          <div style="padding:24px;border-radius:12px;border:1px solid #e0d6cc;background:#fff">
+            <h3 style="margin:0 0 16px;font-size:15px;color:var(--primary)">📶 Internetdekking</h3>
+            <div class="infoBox" style="margin-top:0">
+              <div class="infoIcon">i</div>
+              <div>
+                <p>Controleer glasvezel & mobiel bereik via ARCEP.</p>
+              </div>
+            </div>
+            <a href="https://maconnexioninternet.arcep.fr/?lat=${lat}&lon=${lon}&zoom=17" target="_blank" class="ifr-btn" style="width:100%;text-decoration:none;display:block;text-align:center;margin-bottom:8px">ARCEP: Ma Connexion Internet →</a>
+            <a href="https://monreseaumobile.arcep.fr/" target="_blank" class="ifr-btn" style="width:100%;text-decoration:none;display:block;text-align:center;background:#fff;color:#800000;border:1px solid #800000;font-weight:700;font-size:13px">ARCEP: Mon Réseau Mobile →</a>
+          </div>
+        </div>
+      `;
+    }
+  </script>
 </body>
 </html>
