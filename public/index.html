@@ -343,7 +343,7 @@
     };
 
     const API = {
-      ban: 'https://api-adresse.data.gouv.fr',
+      ban: 'https://data.geopf.fr/geocodage',
       dvf: '/api/dvf',
       risques: '/api/risques',
       cadastre: '/api/cadastre',
@@ -385,7 +385,7 @@
     const btnSearch = document.getElementById('btnSearch');
 
     async function searchBAN(query) {
-      const r = await fetch(`${API.ban}/search/?q=${encodeURIComponent(query)}&limit=6`);
+      const r = await fetch(`${API.ban}/search?q=${encodeURIComponent(query)}&limit=6`);
       const j = await r.json();
       return j.features || [];
     }

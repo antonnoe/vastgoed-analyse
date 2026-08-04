@@ -87,7 +87,7 @@ In Vercel dashboard: Settings → Domains → Add
 |------|-----|--------------|
 | DVF | api.cquest.org | [data.gouv.fr](https://www.data.gouv.fr/fr/datasets/demandes-de-valeurs-foncieres/) |
 | Georisques | georisques.gouv.fr/api/v1 | [API docs](https://api.gouv.fr/les-api/api-georisques) |
-| BAN | api-adresse.data.gouv.fr | [adresse.data.gouv.fr](https://adresse.data.gouv.fr/api-doc/adresse) |
+| BAN | data.geopf.fr/geocodage (Géoplateforme/IGN) | [adresse.data.gouv.fr](https://adresse.data.gouv.fr/outils/api-doc/adresse) |
 | Cadastre | apicarto.ign.fr | [API Carto](https://apicarto.ign.fr/api/doc/cadastre) |
 | GPU | apicarto.ign.fr/api/gpu | [Géoportail Urbanisme](https://www.geoportail-urbanisme.gouv.fr/) |
 | DPE | data.ademe.fr | [Observatoire DPE](https://data.ademe.fr/) |
