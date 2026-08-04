@@ -754,6 +754,89 @@
     }
 
     // =============================
+    // DPE: tel labels uit de ADEME-respons (data-fair lines: { total, results })
+    // Geen schattingen: alleen tellingen van wat werkelijk in de records staat.
+    // =============================
+    const DPE_LABELS = ['A','B','C','D','E','F','G'];
+    const DPE_COLORS = ['#1b5e20','#2e7d32','#558b2f','#9e9d24','#f9a825','#ef6c00','#b71c1c'];
+
+    function dpeStats(raw) {
+      if (!raw || raw.error || raw.status === 'api_unavailable' || raw.status === 'error') {
+        return { state: 'unavailable' };
+      }
+
+      const results = Array.isArray(raw.results) ? raw.results
+        : (Array.isArray(raw) ? raw : []);
+
+      const counts = {};
+      const ges = {};
+      DPE_LABELS.forEach(l => { counts[l] = 0; ges[l] = 0; });
+
+      let n = 0, nGes = 0;
+      results.forEach(r => {
+        const d = String(r?.etiquette_dpe || '').trim().toUpperCase();
+        if (DPE_LABELS.includes(d)) { counts[d]++; n++; }
+        const g = String(r?.etiquette_ges || '').trim().toUpperCase();
+        if (DPE_LABELS.includes(g)) { ges[g]++; nGes++; }
+      });
+
+      if (!n) return { state: 'empty', fetched: results.length };
+
+      const max = Math.max(...DPE_LABELS.map(l => counts[l]));
+      const topGes = nGes
+        ? DPE_LABELS.reduce((a, b) => (ges[b] > ges[a] ? b : a), DPE_LABELS[0])
+        : null;
+
+      return {
+        state: 'ok',
+        counts, n, max, fetched: results.length,
+        total: Number.isFinite(raw.total) ? raw.total : null,
+        topGes, topGesCount: topGes ? ges[topGes] : 0, nGes
+      };
+    }
+
+    function renderDpeBalk(stats) {
+      // Onbekend/fout: neutrale weergave (alles gelijk gedempt), zoals voorheen.
+      if (stats.state !== 'ok') {
+        return DPE_LABELS.map((l, i) =>
+          `<div style="flex:1;text-align:center;padding:6px 0;border-radius:6px;font-weight:800;background:${DPE_COLORS[i]};color:#fff;opacity:0.5">${l}</div>`
+        ).join('');
+      }
+      // Met data: labels die voorkomen krijgen nadruk naar rato van hun aandeel.
+      return DPE_LABELS.map((l, i) => {
+        const c = stats.counts[l];
+        const opacity = c ? (0.55 + 0.45 * (c / stats.max)).toFixed(2) : '0.28';
+        return `<div style="flex:1;text-align:center;padding:6px 0;border-radius:6px;font-weight:800;background:${DPE_COLORS[i]};color:#fff;opacity:${opacity}">
+          ${l}<div style="font-size:10px;font-weight:600;margin-top:2px">${c}</div>
+        </div>`;
+      }).join('');
+    }
+
+    function renderDpeBijsluiter(stats) {
+      if (stats.state === 'unavailable') {
+        return `<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">DPE-registraties in de buurt zijn nu niet op te halen (ADEME).</div>`;
+      }
+      if (stats.state === 'empty') {
+        return `<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Geen DPE-registraties binnen 500 m van dit adres (bron: ADEME).</div>`;
+      }
+      // Alleen benoemen wat feitelijk zo is: de API levert max. 20 records per opvraging.
+      let meer = '';
+      if (stats.total && stats.total > stats.fetched) {
+        meer = ` — de eerste ${stats.fetched} van in totaal ${stats.total.toLocaleString('nl-NL')} registraties die de API teruggeeft (max. 20 per opvraging)`;
+      } else if (stats.fetched > stats.n) {
+        meer = ` — ${stats.fetched - stats.n} registratie(s) zonder energielabel zijn niet meegeteld`;
+      }
+      const gesRegel = stats.topGes
+        ? `<div style="margin-top:4px">Meest voorkomende GES-label in deze ${stats.nGes} records: <strong>${stats.topGes}</strong> (${stats.topGesCount}×).</div>`
+        : '';
+      return `<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">
+        Energielabels van <strong>${stats.n}</strong> woningen binnen 500 m van dit adres (bron: ADEME)${meer}.
+        <strong>Dit is een buurtbeeld, niet het label van dit pand.</strong>
+        ${gesRegel}
+      </div>`;
+    }
+
+    // =============================
     // Render Energie
     // =============================
     function renderEnergie() {
@@ -763,6 +846,8 @@
       // Correcte links (Observatoire DPE-AUDIT + Service-Public ingang)
       const ADEME_OBS = "https://observatoire-dpe-audit.ademe.fr/";
       const SERVICE_PUBLIC_DPE = "https://www.service-public.gouv.fr/particuliers/vosdroits/R67366";
+
+      const stats = dpeStats(state.data.dpe);
 
       document.getElementById('energieContent').innerHTML = `
         <div style="background: var(--bg); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
@@ -774,9 +859,10 @@
           <div style="padding:24px;border-radius:12px;border:2px solid var(--primary);background:#fff">
             <h3 style="margin:0 0 16px;font-size:15px;color:var(--primary)">🏷️ Energielabel (DPE)</h3>
 
-            <div style="display:flex;gap:3px;margin-bottom:16px">
-              ${['A','B','C','D','E','F','G'].map((l,i)=>`<div style="flex:1;text-align:center;padding:6px 0;border-radius:6px;font-weight:800;background:${['#1b5e20','#2e7d32','#558b2f','#9e9d24','#f9a825','#ef6c00','#b71c1c'][i]};color:#fff;opacity:0.5">${l}</div>`).join('')}
+            <div style="display:flex;gap:3px;margin-bottom:8px">
+              ${renderDpeBalk(stats)}
             </div>
+            ${renderDpeBijsluiter(stats)}
 
             <div class="infoBox">
               <div class="infoIcon">i</div>
