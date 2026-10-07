@@ -361,8 +361,9 @@
     function dvfBron(dvf) {
       const m = dvf && dvf.meta;
       const d = m && fmtDate(m.laatste_datum);
+      const j = m && Array.isArray(m.jaren) && m.jaren.length ? (m.jaren.length > 1 ? `${Math.min(...m.jaren)} t/m ${Math.max(...m.jaren)}` : String(m.jaren[0])) : null;
       if (m && m.verouderd) return `Bron: DVF via terugvalbron, <strong>verouderd</strong>${d ? `, transacties t/m ${d}` : ''}. De officiële bron was nu niet bereikbaar.`;
-      return `Bron: DVF (data.gouv.fr)${d ? `, transacties t/m ${d}` : ''}`;
+      return `Bron: DVF (data.gouv.fr)${j ? `, jaren ${j}` : ''}${d ? `, transacties t/m ${d}` : ''}`;
     }
     const dvfOk = (dvf) => !!(dvf && !dvf.error && dvf.meta && dvf.meta.status !== 'fout');
 
@@ -653,6 +654,7 @@
           <div class="infoIcon">i</div>
           <div>
             <p><strong>${esc(dvf.meta.aantal)}</strong> verkopen binnen ${DVF_RADIUS_KM}km. ${dvfBron(dvf)}.</p>
+            ${st.afwijkend_aantal ? `<p style="color:var(--text-muted)"><strong>${esc(st.afwijkend_aantal)}</strong> verkoop(en) gemarkeerd als "afwijkend" (grijs): een €/m² onder 25% of boven 400% van de mediaan${st.afwijkend_grens_m2 ? ` (buiten ${fmtEur(st.afwijkend_grens_m2.onder)} – ${fmtEur(st.afwijkend_grens_m2.boven)})` : ''}, vaak een symbolische prijs of een niet-gemelde samenstelling. Ze tellen niet mee in de statistiek.</p>` : ''}
             <p style="color:var(--text-muted)">€/m² alleen voor verkopen van precies één woning met bekende woonoppervlakte; dépendances tellen niet mee. Indicatie, geen taxatie.</p>
           </div>
         </div>
@@ -678,10 +680,11 @@
             <tbody>
               ${txs.slice(0, 25).map(t => {
                 const ppm2 = t.woning && t.surface ? Math.round(t.prix / t.surface) : null;
+                const af = t.afwijkend ? ' style="color:#9a9a9a;background:#f5f5f5"' : '';
                 return `
-                  <tr>
+                  <tr${af}>
                     <td>${fmtDate(t.date) || '—'}</td>
-                    <td><span class="badge">${esc(t.type || '—')}</span></td>
+                    <td><span class="badge">${esc(t.type || '—')}</span>${t.afwijkend ? ' <span class="badge" style="background:#9a9a9a">afwijkend</span>' : ''}</td>
                     <td class="right"><strong>${fmtEur(t.prix)}</strong></td>
                     <td class="right">${t.woning && t.surface ? esc(t.surface) : '—'}</td>
                     <td class="right">${t.terrain ? Math.round(t.terrain).toLocaleString('nl-NL') : '—'}</td>

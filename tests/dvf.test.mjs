@@ -111,3 +111,19 @@ test('terugval op oude API met verouderd=true, daarna eerlijke fout', async () =
     assert.equal(bad.body.meta.status, 'fout');
   } finally { ms.close(); }
 });
+
+test('afwijkende €/m2 (<25% of >400% van mediaan) gevlagd en buiten statistiek', async () => {
+  const mk = (id, prix, opp) => row({ id_mutation: id, date_mutation: '2025-04-01', nature_mutation: 'Vente', valeur_fonciere: String(prix), id_parcelle: id, type_local: 'Maison', surface_reelle_bati: String(opp), ...loc() });
+  // 3000, 3000, 3000 €/m2 + 1 €/m2 (symbolisch) + 20000 €/m2 (>400%)
+  const lines = [mk('a', 300000, 100), mk('b', 240000, 80), mk('c', 150000, 50), mk('d', 100, 100), mk('e', 2000000, 100)];
+  const ms = await mockServer({ '2025/34': csvGz(lines) });
+  try {
+    const l = await loadDvf({ ...P, radiusKm: 5, dep: '34', base: ms.base, now: new Date('2025-10-07') });
+    const r = buildResult(l, { ...P, radiusKm: 5, dep: '34' });
+    assert.equal(r.transactions.filter((t) => t.afwijkend).length, 2);
+    assert.equal(r.statistiek.alle.n, 3);
+    assert.equal(r.statistiek.alle.mediaan_m2, 3000);
+    assert.equal(r.statistiek.afwijkend_aantal, 2);
+    assert.equal(r.meta.aantal, 5);
+  } finally { ms.close(); }
+});
