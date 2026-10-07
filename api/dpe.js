@@ -2,7 +2,7 @@ import { jsonResponse, CACHE_HOUR, NO_CACHE } from '../lib/http.js';
 import { parseCoords } from '../lib/validate.js';
 import { fetchDpe } from '../lib/sources.js';
 
-export const config = { runtime: 'edge' };
+export const config = { runtime: 'edge', regions: ['cdg1'] };
 
 export default async function handler(request) {
   const c = parseCoords(new URL(request.url).searchParams);

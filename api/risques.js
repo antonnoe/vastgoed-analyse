@@ -3,7 +3,7 @@ import { jsonResponse, CACHE_HOUR, NO_CACHE } from '../lib/http.js';
 import { parseCoords, validInsee } from '../lib/validate.js';
 import { fetchRisques } from '../lib/risques-core.js';
 
-export const config = { runtime: 'edge' };
+export const config = { runtime: 'edge', regions: ['cdg1'] };
 
 export default async function handler(request) {
   const sp = new URL(request.url).searchParams;
