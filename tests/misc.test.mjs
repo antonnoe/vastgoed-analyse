@@ -59,3 +59,31 @@ test('risques: deelresultaten met status per bron', async () => {
   assert.equal(r.status, 'deels');
   assert.ok(r.links.rapport.includes('13055'));
 });
+
+test('risques: totaalbudget, deelresultaten, geen retry na time-out', async () => {
+  const calls = {};
+  const f = (url, o) => {
+    const k = url.split('/api/v1/')[1].split('?')[0];
+    calls[k] = (calls[k] || 0) + 1;
+    if (k === 'radon') return Promise.resolve(new Response(JSON.stringify({ data: [{ classe_potentiel: '2' }] }), { status: 200 }));
+    return new Promise((_, rej) => o.signal.addEventListener('abort', () => rej(Object.assign(new Error('abort'), { name: 'AbortError' }))));
+  };
+  const t0 = Date.now();
+  const r = await fetchRisques({ lat: 43.3, lon: 5.37, insee: '13055', fetchImpl: f, budgetMs: 200 });
+  const ms = Date.now() - t0;
+  assert.ok(ms < 600, `duurde ${ms} ms`);
+  assert.equal(r.radon.status, 'ok');
+  assert.equal(r.bronnen.cavites.status, 'time-out');
+  assert.equal(r.status, 'deels');
+  assert.equal(calls.cavites, 1);
+});
+
+test('risques: 5xx wordt binnen het budget nog eens geprobeerd', async () => {
+  let n = 0;
+  const f = async (url) => {
+    if (url.includes('/radon')) { n++; return n === 1 ? new Response('', { status: 503 }) : new Response(JSON.stringify({ data: [{ classe_potentiel: '1' }] }), { status: 200 }); }
+    return new Response('', { status: 404 });
+  };
+  const r = await fetchRisques({ lat: 43.3, lon: 5.37, insee: '13055', fetchImpl: f, budgetMs: 2000 });
+  assert.equal(r.radon.status, 'ok'); assert.equal(n, 2);
+});

@@ -41,3 +41,25 @@ jobs:
           gh issue create --repo "$GITHUB_REPOSITORY" \
             --title "Smoke-test mislukt (${GITHUB_EVENT_NAME}, $(date -u +%Y-%m-%d))" \
             --body "De smoke-test tegen $SMOKE_BASE_URL is mislukt. Zie de run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+      - name: Alarm bij langdurige Géorisques-uitval (één issue, label bron-uitval)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -f .smoke-georisques ] || { echo "Geen meting beschikbaar, issue ongemoeid gelaten"; exit 0; }
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          OPEN=$(gh issue list --repo "$GITHUB_REPOSITORY" --label bron-uitval --state open --json number --jq '.[0].number // empty')
+          if [ "$(head -n1 .smoke-georisques)" = "down" ]; then
+            REDEN=$(sed -n 2p .smoke-georisques)
+            if [ -n "$OPEN" ]; then
+              gh issue comment "$OPEN" --repo "$GITHUB_REPOSITORY" --body "Nog steeds uitval ($(date -u +%Y-%m-%d)): $REDEN. Run: $RUN_URL"
+            else
+              gh label create bron-uitval --repo "$GITHUB_REPOSITORY" --color B60205 --description "Externe bron langdurig onbereikbaar" 2>/dev/null || true
+              gh issue create --repo "$GITHUB_REPOSITORY" --label bron-uitval \
+                --title "Géorisques onbereikbaar ($(date -u +%Y-%m-%d))" \
+                --body "$REDEN. De risico-tab toont 'Niet beschikbaar op dit moment'. Het issue sluit automatisch zodra de bron weer werkt. Run: $RUN_URL"
+            fi
+          elif [ -n "$OPEN" ]; then
+            gh issue comment "$OPEN" --repo "$GITHUB_REPOSITORY" --body "Géorisques werkt weer. Run: $RUN_URL"
+            gh issue close "$OPEN" --repo "$GITHUB_REPOSITORY" --reason completed
+          fi

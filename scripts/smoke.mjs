@@ -18,6 +18,8 @@ const DEEL_STATUS = new Set(['ok', 'leeg', 'deels', 'niet_beschikbaar', 'time-ou
 
 const rows = [];
 let failed = 0;
+const risqueUit = {};   // locatie -> true als geen enkele Géorisques-bron bereikbaar was
+let healthRisques = null;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function get(path, timeoutMs = 70000) {
@@ -70,6 +72,7 @@ for (const L of LOCATIES) {
     if (r.status !== 200) fouten.push(`HTTP ${r.status}`);
     for (const k of RISQUE_BRONNEN) if (!BRON_STATUS.has(b?.[k]?.status)) fouten.push(`status ontbreekt: ${k}`);
     const ok = RISQUE_BRONNEN.filter((k) => b?.[k]?.status === 'ok' || b?.[k]?.status === 'leeg').length;
+    if (b && !fouten.length) risqueUit[L.naam] = ok === 0;
     return { ok: !fouten.length, ms: r.ms, note: fouten.join('; ') || `${ok}/${RISQUE_BRONNEN.length} bronnen bereikbaar (${RISQUE_BRONNEN.filter((k) => !['ok','leeg'].includes(b[k].status)).join(',') || '-'} niet)` };
   });
   for (const route of ['urbanisme', 'cadastre', 'dpe']) {
@@ -89,10 +92,28 @@ await check('Marseille (testpunt)', 'health', async () => {
   const fouten = [];
   if (r.status !== 200) fouten.push(`HTTP ${r.status}, status ${r.json?.status}`);
   if (r.json?.status === 'verouderd') fouten.push('DVF verouderd');
+  healthRisques = r.json?.bronnen?.risques?.status ?? null;
   return { ok: !fouten.length, ms: r.ms, note: fouten.join('; ') || `status ${r.json.status}, dvf t/m ${r.json.dvf_dekking?.laatste_datum}` };
 });
 
 console.log(`Smoke-test tegen ${BASE}\n`);
 console.table(rows);
 console.log(failed ? `\n${failed} controle(s) mislukt` : '\nAlle controles geslaagd');
+
+// Bronuitval Géorisques: waarschuwing, geen falen. De Action leest .smoke-georisques voor het issue.
+const gemeten = Object.keys(risqueUit);
+const alleLocatiesUit = gemeten.length === LOCATIES.length && gemeten.every((n) => risqueUit[n]);
+const healthUit = healthRisques === 'niet_beschikbaar';
+if (gemeten.length || healthRisques) {
+  const uit = alleLocatiesUit || healthUit;
+  const reden = [alleLocatiesUit ? `geen enkele Géorisques-bron bereikbaar op alle ${LOCATIES.length} testlocaties` : null,
+    healthUit ? '/api/health meldt risques: niet_beschikbaar' : null].filter(Boolean).join('; ');
+  const { writeFileSync, appendFileSync } = await import('node:fs');
+  writeFileSync('.smoke-georisques', uit ? `down\n${reden}\n` : 'up\n');
+  if (uit) {
+    const w = `⚠️ Bronuitval Géorisques: ${reden}. De smoke-test blijft groen; de risico-tab toont "Niet beschikbaar op dit moment".`;
+    console.log(`\n${w}`);
+    if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n> ${w}\n`);
+  }
+}
 process.exit(failed ? 1 : 0);
