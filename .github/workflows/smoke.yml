@@ -1,0 +1,43 @@
+name: Smoke-test live
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 6 * * 1'   # wekelijks, maandag
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  # Zet de repository-variabele SMOKE_BASE_URL om een ander domein te testen.
+  SMOKE_BASE_URL: ${{ vars.SMOKE_BASE_URL || 'https://vastgoed-analyse-v84x.vercel.app' }}
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Unit-tests
+        run: npm test
+      - name: Smoke-test (bij push eerst wachten op de Vercel-deploy van deze commit)
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            node scripts/smoke.mjs --wait-commit "$GITHUB_SHA"
+          else
+            node scripts/smoke.mjs
+          fi
+      - name: Melding per issue bij falen (GitHub mailt de repo-eigenaar)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "Smoke-test mislukt (${GITHUB_EVENT_NAME}, $(date -u +%Y-%m-%d))" \
+            --body "De smoke-test tegen $SMOKE_BASE_URL is mislukt. Zie de run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

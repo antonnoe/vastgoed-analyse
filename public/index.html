@@ -256,22 +256,22 @@
         <div class="ifr-kpi">
           <div class="ifr-kpi-label">Transacties</div>
           <div class="ifr-kpi-value" id="kpiTx">—</div>
-          <div class="ifr-kpi-note">Straal 5km, DVF 2025</div>
+          <div class="ifr-kpi-note" id="kpiTxNote">Straal 5km, DVF</div>
         </div>
         <div class="ifr-kpi">
-          <div class="ifr-kpi-label">Gem. prijs/m²</div>
+          <div class="ifr-kpi-label">Mediaan prijs/m²</div>
           <div class="ifr-kpi-value" id="kpiAvgPrice">—</div>
-          <div class="ifr-kpi-note">Indicatief op basis DVF</div>
+          <div class="ifr-kpi-note" id="kpiAvgNote">Indicatief op basis DVF</div>
         </div>
         <div class="ifr-kpi">
           <div class="ifr-kpi-label">Risico’s</div>
           <div class="ifr-kpi-value" id="kpiRisk">—</div>
-          <div class="ifr-kpi-note">GéoRisques</div>
+          <div class="ifr-kpi-note" id="kpiRiskNote">GéoRisques</div>
         </div>
         <div class="ifr-kpi">
           <div class="ifr-kpi-label">PLU / GPU</div>
           <div class="ifr-kpi-value" id="kpiPLU">—</div>
-          <div class="ifr-kpi-note">Géoportail Urbanisme</div>
+          <div class="ifr-kpi-note" id="kpiPLUNote">Géoportail Urbanisme</div>
         </div>
       </div>
 
@@ -351,9 +351,20 @@
       dpe: '/api/dpe'
     };
 
-    const DVF_YEAR = 2025;
     const DVF_RADIUS_KM = 5;
-    const DVF_SOURCE_NOTE = "DVF 2025 (alternatieve API; officiële overheid-API onbetrouwbaar)";
+
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    const fmtDate = (iso) => { const d = iso ? new Date(iso) : null; return d && !isNaN(d) ? d.toLocaleDateString('nl-NL') : null; };
+    const fmtEur = (n) => (n == null ? '—' : Math.round(n).toLocaleString('nl-NL') + ' €');
+
+    // Bronregel voor DVF: toont de werkelijke laatste datum uit de data, nooit een vast jaartal.
+    function dvfBron(dvf) {
+      const m = dvf && dvf.meta;
+      const d = m && fmtDate(m.laatste_datum);
+      if (m && m.verouderd) return `Bron: DVF via terugvalbron, <strong>verouderd</strong>${d ? `, transacties t/m ${d}` : ''}. De officiële bron was nu niet bereikbaar.`;
+      return `Bron: DVF (data.gouv.fr)${d ? `, transacties t/m ${d}` : ''}`;
+    }
+    const dvfOk = (dvf) => !!(dvf && !dvf.error && dvf.meta && dvf.meta.status !== 'fout');
 
     // =============================
     // Tabs
@@ -458,10 +469,15 @@
 
     async function fetchDVF(lat, lon) {
       try {
-        const r = await fetch(`${API.dvf}?lat=${lat}&lon=${lon}&radius=${DVF_RADIUS_KM}`);
+        // Afronden op 3 decimalen (±100 m) geeft een bruikbare cache-sleutel.
+        const rl = (x) => Math.round(x * 1000) / 1000;
+        const loc = state.location.properties || {};
+        const qs = `lat=${rl(lat)}&lon=${rl(lon)}&radius=${DVF_RADIUS_KM}&code_insee=${encodeURIComponent(loc.citycode || '')}&postcode=${encodeURIComponent(loc.postcode || '')}`;
+        const r = await fetch(`${API.dvf}?${qs}`);
         state.data.dvf = await r.json();
+        if (!r.ok && !state.data.dvf.error) state.data.dvf.error = 'DVF-data niet beschikbaar';
       } catch (e) {
-        state.data.dvf = { transactions: [], error: true };
+        state.data.dvf = { transactions: [], error: 'DVF-data niet beschikbaar' };
       }
     }
 
@@ -505,19 +521,27 @@
     // KPIs
     // =============================
     function updateKPIs(){
-      const txs = state.data.dvf?.transactions || [];
-      document.getElementById('kpiTx').textContent = txs.length ? String(txs.length) : '0';
+      const dvf = state.data.dvf;
+      const ok = dvfOk(dvf);
+      document.getElementById('kpiTx').textContent = ok ? String((dvf.transactions || []).length ? dvf.meta.aantal : 0) : 'n/b';
+      document.getElementById('kpiTxNote').textContent = ok ? `Straal ${DVF_RADIUS_KM}km, DVF${dvf.meta.verouderd ? ' (verouderd)' : ''}` : 'Niet beschikbaar op dit moment';
 
-      const woningen = txs.filter(t => t.surface && (t.type === 'Maison' || t.type === 'Appartement'));
-      const avg = woningen.length ? Math.round(woningen.reduce((s,t)=> s + (t.prix / t.surface), 0) / woningen.length) : null;
-      document.getElementById('kpiAvgPrice').textContent = avg ? `${avg.toLocaleString('nl-NL')} €` : '—';
+      const st = ok ? dvf.statistiek && dvf.statistiek.alle : null;
+      document.getElementById('kpiAvgPrice').textContent = st && st.n ? fmtEur(st.mediaan_m2) : '—';
+      document.getElementById('kpiAvgNote').textContent = st && st.n
+        ? `P25 ${fmtEur(st.p25)} – P75 ${fmtEur(st.p75)} (n=${st.n})`
+        : (ok ? 'Te weinig woningverkopen' : 'Niet beschikbaar op dit moment');
 
-      const risques = state.data.risques || {};
-      const rCount = ['inondation','seisme','radon','argile','seveso'].filter(k => risques[k]).length;
-      document.getElementById('kpiRisk').textContent = rCount ? String(rCount) : '—';
+      const r = state.data.risques;
+      const rOk = r && !r.error && r.status !== 'niet_beschikbaar';
+      const present = rOk ? [r.inondation?.aanwezig, r.argiles?.aanwezig, r.industriel?.seveso, (r.cavites?.aantal || 0) > 0, (r.pollution?.aantal || 0) > 0].filter(Boolean).length : null;
+      document.getElementById('kpiRisk').textContent = !rOk ? 'n/b' : String(present);
+      document.getElementById('kpiRiskNote').textContent = !rOk ? 'Niet beschikbaar op dit moment' : (r.status === 'deels' ? 'GéoRisques, deels beschikbaar' : 'Gesignaleerde risico’s');
 
-      const plu = state.data.urbanisme?.plu?.url || state.data.urbanisme?.gpu?.url;
-      document.getElementById('kpiPLU').textContent = plu ? 'Ja' : '—';
+      const u = state.data.urbanisme;
+      const uOk = u && !u.error && (u.status === 'ok' || u.status === 'leeg');
+      document.getElementById('kpiPLU').textContent = !uOk ? 'n/b' : (u.zones.length ? u.zones[0].typezone || 'Ja' : 'Geen');
+      document.getElementById('kpiPLUNote').textContent = !uOk ? 'Niet beschikbaar op dit moment' : (u.zones.length ? 'Zone in GPU' : 'Geen digitaal plan in GPU');
     }
 
     // =============================
@@ -532,12 +556,9 @@
       const commune = f.properties.city || '';
       const postcode = f.properties.postcode || '';
 
-      const txs = state.data.dvf?.transactions || [];
-      const avgM2 = (() => {
-        const woningen = txs.filter(t => t.surface && (t.type === 'Maison' || t.type === 'Appartement'));
-        if(!woningen.length) return null;
-        return Math.round(woningen.reduce((s,t)=> s + (t.prix / t.surface), 0) / woningen.length);
-      })();
+      const dvf = state.data.dvf;
+      const dvfGoed = dvfOk(dvf);
+      const st = dvfGoed ? dvf.statistiek?.alle : null;
 
       const links = [
         { label: 'GéoRisques — kaart & rapport', url: `https://www.georisques.gouv.fr/`, icon: '⚠️' },
@@ -562,8 +583,8 @@
           <div style="padding:18px;border:1px solid var(--border);border-radius:14px;background:#fff">
             <h3 style="margin:0 0 10px;font-size:15px">📊 Snelle duiding</h3>
             <ul style="margin:0;padding-left:18px;font-size:13px">
-              <li>DVF (2025): <strong>${txs.length}</strong> transacties binnen ${DVF_RADIUS_KM}km (${DVF_SOURCE_NOTE}).</li>
-              <li>Gemiddeld (woningen met m²): <strong>${avgM2 ? avgM2.toLocaleString('nl-NL') + ' €/m²' : '—'}</strong> (indicatief).</li>
+              <li>DVF: ${dvfGoed ? `<strong>${dvf.meta.aantal}</strong> verkopen binnen ${DVF_RADIUS_KM}km. ${dvfBron(dvf)}.` : 'Niet beschikbaar op dit moment.'}</li>
+              <li>Mediaan woningen: <strong>${st && st.n ? fmtEur(st.mediaan_m2) + '/m²' : '—'}</strong>${st && st.n ? ` (P25 ${fmtEur(st.p25)}, P75 ${fmtEur(st.p75)}, n=${st.n}). Indicatie, geen taxatie.` : '.'}</li>
               <li>Risico’s: kijk naar de tab “Risico’s” voor radon/klei/inondation/seismisch/SEVESO.</li>
               <li>PLU/GPU: check tab “Kadaster” voor planologische bronlinks.</li>
             </ul>
@@ -589,33 +610,58 @@
     // =============================
     function renderTransacties() {
       const c = document.getElementById('transactiesContent');
-      const txs = state.data.dvf?.transactions || [];
+      const dvf = state.data.dvf;
+
+      if (!dvfOk(dvf)) {
+        c.innerHTML = `
+          <div class="ifr-empty">
+            <div class="ifr-empty-icon">⚠️</div>
+            <p>Niet beschikbaar op dit moment.</p>
+            <a href="https://explore.data.gouv.fr/immobilier" target="_blank" class="ifr-btn" style="margin-top:12px;text-decoration:none">Open DVF Explorer →</a>
+          </div>`;
+        return;
+      }
+
+      const txs = dvf.transactions || [];
+      const st = dvf.statistiek || {};
+
+      if (dvf.meta.status === 'geen_dekking') {
+        c.innerHTML = `
+          <div class="ifr-empty">
+            <div class="ifr-empty-icon">📭</div>
+            <p>Voor dit departement is geen DVF-bestand gevonden. DVF dekt niet heel Frankrijk (o.a. Elzas-Moezel en Mayotte vallen buiten de dataset).</p>
+          </div>`;
+        return;
+      }
 
       if (!txs.length) {
         c.innerHTML = `
           <div class="ifr-empty">
             <div class="ifr-empty-icon">📭</div>
-            <p>Geen transacties gevonden binnen ${DVF_RADIUS_KM}km in ${DVF_YEAR}</p>
-            <div class="infoBox" style="max-width:700px;margin:14px auto 0">
-              <div class="infoIcon">i</div>
-              <div>
-                <p><strong>Beperking:</strong> ${DVF_SOURCE_NOTE}. In landelijke gebieden kan dit overzicht onvolledig zijn.</p>
-              </div>
-            </div>
-          </div>
-        `;
+            <p>Geen verkopen gevonden binnen ${DVF_RADIUS_KM}km in de beschikbare jaren (${esc((dvf.meta.jaren || []).join(', '))}).</p>
+            <div class="infoBox" style="max-width:700px;margin:14px auto 0"><div class="infoIcon">i</div><div><p>${dvfBron(dvf)}. In landelijke gebieden zijn weinig verkopen.</p></div></div>
+          </div>`;
         return;
       }
 
-      const woningen = txs.filter(t => t.surface && (t.type === 'Maison' || t.type === 'Appartement'));
+      const statRow = (label, x) => x && x.n
+        ? `<tr><td>${label}</td><td class="right"><strong>${fmtEur(x.mediaan_m2)}</strong></td><td class="right">${fmtEur(x.p25)}</td><td class="right">${fmtEur(x.p75)}</td><td class="right">${x.n}</td></tr>` : '';
+      const statRows = [statRow('Alle woningen', st.alle), statRow('Maison', st.maison), statRow('Appartement', st.appartement)].join('');
 
       c.innerHTML = `
         <div class="infoBox" style="margin-top:12px">
           <div class="infoIcon">i</div>
           <div>
-            <p><strong>${txs.length}</strong> transacties (${DVF_YEAR}); <strong>${woningen.length}</strong> woningen met oppervlakte. <span style="color:var(--text-muted)">${DVF_SOURCE_NOTE}.</span></p>
+            <p><strong>${esc(dvf.meta.aantal)}</strong> verkopen binnen ${DVF_RADIUS_KM}km. ${dvfBron(dvf)}.</p>
+            <p style="color:var(--text-muted)">€/m² alleen voor verkopen van precies één woning met bekende woonoppervlakte; dépendances tellen niet mee. Indicatie, geen taxatie.</p>
           </div>
         </div>
+
+        ${statRows ? `<div style="overflow:auto;border:1px solid var(--border);border-radius:12px;margin-bottom:14px">
+          <table class="ifr-table">
+            <thead><tr><th>Mediaan €/m²</th><th class="right">Mediaan</th><th class="right">P25</th><th class="right">P75</th><th class="right">n</th></tr></thead>
+            <tbody>${statRows}</tbody>
+          </table></div>` : ''}
 
         <div style="overflow:auto;border:1px solid var(--border);border-radius:12px">
           <table class="ifr-table">
@@ -625,20 +671,20 @@
                 <th>Type</th>
                 <th class="right">Prijs</th>
                 <th class="right">m²</th>
+                <th class="right">Terrein m²</th>
                 <th class="right">€/m²</th>
               </tr>
             </thead>
             <tbody>
               ${txs.slice(0, 25).map(t => {
-                const ppm2 = t.surface ? Math.round(t.prix / t.surface) : null;
-                const d = t.date ? new Date(t.date) : null;
-                const dStr = d ? d.toLocaleDateString('nl-NL') : '—';
+                const ppm2 = t.woning && t.surface ? Math.round(t.prix / t.surface) : null;
                 return `
                   <tr>
-                    <td>${dStr}</td>
-                    <td><span class="badge">${t.type || '—'}</span></td>
-                    <td class="right"><strong>${(t.prix || 0).toLocaleString('nl-NL')} €</strong></td>
-                    <td class="right">${t.surface ? t.surface : '—'}</td>
+                    <td>${fmtDate(t.date) || '—'}</td>
+                    <td><span class="badge">${esc(t.type || '—')}</span></td>
+                    <td class="right"><strong>${fmtEur(t.prix)}</strong></td>
+                    <td class="right">${t.woning && t.surface ? esc(t.surface) : '—'}</td>
+                    <td class="right">${t.terrain ? Math.round(t.terrain).toLocaleString('nl-NL') : '—'}</td>
                     <td class="right">${ppm2 ? ppm2.toLocaleString('nl-NL') : '—'}</td>
                   </tr>
                 `;
@@ -647,7 +693,7 @@
           </table>
         </div>
 
-        ${txs.length > 25 ? `<p style="margin-top:12px;font-size:12px;color:var(--text-muted)">Toont 25 van ${txs.length} transacties</p>` : ''}
+        ${txs.length > 25 ? `<p style="margin-top:12px;font-size:12px;color:var(--text-muted)">Toont 25 van ${esc(dvf.meta.aantal)} verkopen</p>` : ''}
       `;
     }
 
@@ -657,54 +703,62 @@
     function renderRisicos(){
       const c = document.getElementById('risicosContent');
       const r = state.data.risques;
+      const rapport = (r && r.links && r.links.rapport) || 'https://georisques.gouv.fr/mes-risques/connaitre-les-risques-pres-de-chez-moi';
 
-      if(!r || r.error){
+      if(!r || r.error || r.status === 'niet_beschikbaar'){
         c.innerHTML = `
           <div class="ifr-empty">
             <div class="ifr-empty-icon">⚠️</div>
-            <p>Risico-data niet beschikbaar (API fout of limiet).</p>
-            <a href="https://www.georisques.gouv.fr/" target="_blank" class="ifr-btn" style="margin-top:12px">Open GéoRisques →</a>
-          </div>
-        `;
+            <p>Niet beschikbaar op dit moment.</p>
+            <a href="${rapport}" target="_blank" class="ifr-btn" style="margin-top:12px;text-decoration:none">Bekijk het Géorisques-rapport →</a>
+          </div>`;
         return;
       }
 
-      const items = [
-        { key:'inondation', label:'Overstroming', val:r.inondation },
-        { key:'seisme', label:'Seismisch', val:r.seisme },
-        { key:'radon', label:'Radon', val:r.radon },
-        { key:'argile', label:'Klei (RGA)', val:r.argile },
-        { key:'seveso', label:'SEVESO', val:r.seveso }
-      ].filter(x => x.val);
+      const upDown = (st) => st === 'ok' || st === 'leeg';
+      const pill = (cls, txt) => `<span class="risk-pill ${cls}">${esc(txt)}</span>`;
+      const nb = `<div style="margin-top:8px;font-size:13px;color:var(--text-muted)">Niet beschikbaar op dit moment. <a href="${rapport}" target="_blank">Géorisques-rapport</a></div>`;
 
-      if(!items.length){
-        c.innerHTML = `
-          <div class="ifr-empty">
-            <div class="ifr-empty-icon">✅</div>
-            <p>Geen risico-indicatoren teruggekregen voor dit punt.</p>
-            <a href="https://www.georisques.gouv.fr/" target="_blank" class="ifr-btn" style="margin-top:12px">Check op kaart →</a>
+      // Per risico: bron-status bepaalt de weergave; een ontbrekende bron wordt nooit als "geen risico" getoond.
+      const card = (label, st, body, risk) => `
+        <div style="padding:16px;border:1px solid var(--border);border-radius:14px;background:#fff">
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+            <strong>${label}</strong>${upDown(st) ? risk : pill('medium', 'n/b')}
           </div>
-        `;
-        return;
-      }
+          ${upDown(st) ? `<div style="margin-top:8px;font-size:13px;color:var(--text-muted)">${body}</div>` : nb}
+        </div>`;
+
+      const cards = [];
+      const inon = r.inondation || {}, arg = r.argiles || {}, sei = r.seisme || {}, rad = r.radon || {};
+      const ind = r.industriel || {}, cav = r.cavites || {}, pol = r.pollution || {};
+
+      cards.push(card('Overstroming', inon.status,
+        inon.aanwezig ? esc(inon.details.join('; ')) : 'Geen overstromingsrisico vermeld voor deze gemeente (GASPAR).',
+        inon.aanwezig ? pill('high', 'aanwezig') : pill('low', 'niet vermeld')));
+      cards.push(card('Klei (RGA)', arg.status,
+        arg.aanwezig ? esc(arg.alea) : 'Geen klei-risico vermeld voor deze gemeente (GASPAR).',
+        arg.aanwezig ? pill('medium', 'aanwezig') : pill('low', 'niet vermeld')));
+      cards.push(card('Seismisch', sei.status,
+        sei.zone ? `Zone ${sei.zone} van 5` : 'Geen zone teruggekregen voor deze gemeente.',
+        sei.niveau ? pill(getRiskClass(sei.niveau), sei.niveau.replace('_', ' ')) : pill('medium', 'onbekend')));
+      cards.push(card('Radon', rad.status,
+        rad.categorie ? `Potentieelklasse ${rad.categorie} van 3` : 'Geen klasse teruggekregen voor deze gemeente.',
+        rad.niveau ? pill(getRiskClass(rad.niveau), rad.niveau) : pill('medium', 'onbekend')));
+      cards.push(card('SEVESO / ICPE', ind.status,
+        ind.aantal ? `${ind.aantal} geclassificeerde installatie(s) binnen ${ind.straal_m} m${ind.seveso ? ', waaronder SEVESO' : ''}.` : `Geen installaties gevonden binnen ${ind.straal_m} m.`,
+        ind.seveso ? pill('high', 'SEVESO') : (ind.aantal ? pill('medium', `${ind.aantal} ICPE`) : pill('low', 'geen'))));
+      cards.push(card('Holtes (cavités)', cav.status,
+        cav.aantal ? `${cav.aantal} holte(n) binnen ${cav.straal_m} m.` : `Geen holtes gevonden binnen ${cav.straal_m} m.`,
+        cav.aantal ? pill('medium', String(cav.aantal)) : pill('low', 'geen')));
+      cards.push(card('Vervuilde bodem (SIS)', pol.status,
+        pol.aantal ? `${pol.aantal} site(s) binnen ${pol.straal_m} m.` : `Geen sites gevonden binnen ${pol.straal_m} m.`,
+        pol.aantal ? pill('medium', String(pol.aantal)) : pill('low', 'geen')));
 
       c.innerHTML = `
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:12px">
-          ${items.map(it => `
-            <div style="padding:16px;border:1px solid var(--border);border-radius:14px;background:#fff">
-              <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
-                <strong>${it.label}</strong>
-                <span class="risk-pill ${getRiskClass(it.val.niveau || it.val.level || it.val)}">${(it.val.niveau || it.val.level || it.val || '—')}</span>
-              </div>
-              <div style="margin-top:8px;font-size:13px;color:var(--text-muted)">
-                ${it.val.detail || it.val.description || 'Zie officiële bron voor details.'}
-              </div>
-            </div>
-          `).join('')}
-        </div>
-
+        ${r.status === 'deels' ? `<div class="infoBox" style="margin-top:12px"><div class="infoIcon">i</div><div><p>Niet alle risicobronnen reageerden. Waar data ontbreekt staat "Niet beschikbaar op dit moment"; dat betekent niet dat er geen risico is.</p></div></div>` : ''}
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:12px">${cards.join('')}</div>
         <div style="margin-top:16px">
-          <a class="ifr-btn" target="_blank" href="https://www.georisques.gouv.fr/" style="text-decoration:none">Open GéoRisques →</a>
+          <a class="ifr-btn" target="_blank" href="${rapport}" style="text-decoration:none">Volledig Géorisques-rapport →</a>
         </div>
       `;
     }
@@ -718,36 +772,41 @@
       const urb = state.data.urbanisme;
 
       const [lon, lat] = state.location.geometry.coordinates;
+      const gpuKaart = `https://www.geoportail-urbanisme.gouv.fr/map/#/center/${lon}/${lat}/zoom/17`;
+      const nb = (txt) => `<div style="color:var(--text-muted);font-size:13px">${txt}</div>`;
+
+      let kadasterHtml;
+      if (!cad || cad.error || cad.status === 'niet_beschikbaar') kadasterHtml = nb('Niet beschikbaar op dit moment.');
+      else {
+        const p = cad.parcelle || {}, m = cad.commune || {};
+        const item = (p.items || [])[0];
+        kadasterHtml = `<div style="font-size:13px;color:var(--text-muted)">
+          Commune: <strong>${esc(m.nom || item?.commune || '—')}</strong><br>
+          INSEE: <strong>${esc(m.code || item?.code_insee || '—')}</strong><br>
+          ${p.status === 'ok' && item
+            ? `Section: <strong>${esc(item.section || '—')}</strong><br>Perceel: <strong>${esc(item.numero || '—')}</strong>${item.contenance ? ` (${esc(item.contenance)} m²)` : ''}`
+            : (p.status === 'leeg' ? 'Geen perceel gevonden op dit punt.' : 'Perceelgegevens niet beschikbaar op dit moment.')}
+        </div>`;
+      }
+
+      let pluHtml;
+      if (!urb || urb.error || urb.status === 'time-out' || urb.status === 'fout') pluHtml = nb('Niet beschikbaar op dit moment.');
+      else if (urb.status === 'leeg') pluHtml = nb('Geen digitaal plan gevonden voor deze locatie in het GPU. Controleer bij de gemeente.');
+      else pluHtml = `<div style="font-size:13px;color:var(--text-muted)">${urb.zones.map(z => `
+          Zone <strong>${esc(z.libelle || '—')}</strong>${z.typezone ? ` (type ${esc(z.typezone)})` : ''}${z.libelong ? `<br>${esc(z.libelong)}` : ''}${z.document ? `<br>Document: ${esc(z.document)}` : ''}${z.url && /^https?:\/\//.test(z.url) ? `<br><a href="${esc(z.url)}" target="_blank">Plan openen</a>` : ''}`).join('<hr style="border:none;border-top:1px solid var(--border)">')}</div>`;
 
       c.innerHTML = `
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:12px">
           <div style="padding:18px;border:1px solid var(--border);border-radius:14px;background:#fff">
             <h3 style="margin:0 0 10px;font-size:15px;color:var(--primary)">🗺️ Kadaster (IGN API Carto)</h3>
-            ${(!cad || cad.error) ? `
-              <div style="color:var(--text-muted);font-size:13px">Kadasterdata niet beschikbaar.</div>
-            ` : `
-              <div style="font-size:13px;color:var(--text-muted)">
-                Commune: <strong>${cad.commune || '—'}</strong><br>
-                INSEE: <strong>${cad.insee || '—'}</strong><br>
-                Section: <strong>${cad.section || '—'}</strong><br>
-                Parcel(en): <strong>${(cad.parcelles || []).join(', ') || '—'}</strong>
-              </div>
-            `}
+            ${kadasterHtml}
             <a href="https://www.cadastre.gouv.fr/scpc/rechercherPlan.do" target="_blank" class="ifr-btn" style="margin-top:12px;text-decoration:none;display:inline-block">Open kadaster →</a>
           </div>
 
           <div style="padding:18px;border:1px solid var(--border);border-radius:14px;background:#fff">
             <h3 style="margin:0 0 10px;font-size:15px;color:var(--primary)">🏛️ PLU / GPU</h3>
-            ${(!urb || urb.error) ? `
-              <div style="color:var(--text-muted);font-size:13px">Urbanisme-data niet beschikbaar.</div>
-            ` : `
-              <div style="font-size:13px;color:var(--text-muted)">
-                ${urb.plu?.url ? `PLU-link: <a href="${urb.plu.url}" target="_blank">open</a><br>` : ''}
-                ${urb.gpu?.url ? `GPU-link: <a href="${urb.gpu.url}" target="_blank">open</a><br>` : ''}
-                ${(!urb.plu?.url && !urb.gpu?.url) ? 'Geen PLU/GPU-link teruggekregen (niet alle gemeenten hebben dekking via API).' : ''}
-              </div>
-            `}
-            <a href="https://www.geoportail-urbanisme.gouv.fr/map/#/center/${lon}/${lat}/zoom/17" target="_blank" class="ifr-btn" style="margin-top:12px;text-decoration:none;display:inline-block">Open GPU kaart →</a>
+            ${pluHtml}
+            <a href="${gpuKaart}" target="_blank" class="ifr-btn" style="margin-top:12px;text-decoration:none;display:inline-block">Open GPU kaart →</a>
           </div>
         </div>
       `;
@@ -761,7 +820,7 @@
     const DPE_COLORS = ['#1b5e20','#2e7d32','#558b2f','#9e9d24','#f9a825','#ef6c00','#b71c1c'];
 
     function dpeStats(raw) {
-      if (!raw || raw.error || raw.status === 'api_unavailable' || raw.status === 'error') {
+      if (!raw || raw.error || raw.status === 'time-out' || raw.status === 'fout') {
         return { state: 'unavailable' };
       }
 

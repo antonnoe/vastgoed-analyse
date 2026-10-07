@@ -1,45 +1,27 @@
-// Vercel Serverless Function - DVF via BigQuery Cloud Function
-export const config = {
-  runtime: 'edge',
-};
+// DVF-transacties uit het officiële geo-dvf bestand (data.gouv.fr), gestreamd en gefilterd.
+// Node-runtime: gzip-streaming heeft zlib en een ruime time-out nodig.
+import { dvfService, resolveDept, round3 } from '../lib/dvf-service.js';
+import { parseCoords, validInsee } from '../lib/validate.js';
+import { CORS } from '../lib/http.js';
 
-export default async function handler(request) {
-  const { searchParams } = new URL(request.url);
-  const lat = searchParams.get('lat');
-  const lon = searchParams.get('lon');
-  const radius = searchParams.get('radius') || '2';
+function send(res, status, body, cache) {
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', cache);
+  for (const [k, v] of Object.entries(CORS)) res.setHeader(k, v);
+  res.end(JSON.stringify(body));
+}
 
-  if (!lat || !lon) {
-    return Response.json(
-      { error: 'lat en lon parameters vereist' },
-      { status: 400 }
-    );
-  }
+export default async function handler(req, res) {
+  const sp = new URL(req.url, 'http://localhost').searchParams;
+  const c = parseCoords(sp);
+  if (c.error) return send(res, 400, { error: c.error }, 'no-store');
 
-  const cloudFunctionUrl = 'https://dvf-api-1012901367480.europe-west1.run.app';
+  const radiusKm = Math.min(Math.max(Number(sp.get('radius')) || 5, 0.5), 10);
+  const insee = validInsee(sp.get('code_insee') || '');
+  const dep = await resolveDept({ dep: sp.get('dep'), insee, postcode: sp.get('postcode'), lat: c.lat, lon: c.lon });
+  if (!dep) return send(res, 400, { error: 'departement niet te bepalen uit code_insee/postcode/coördinaten' }, 'no-store');
 
-  try {
-    const response = await fetch(
-      `${cloudFunctionUrl}?lat=${lat}&lon=${lon}&radius=${radius}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Cloud Function error: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    return Response.json(data, {
-      headers: {
-        'Cache-Control': 's-maxage=3600',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
-
-  } catch (error) {
-    return Response.json(
-      { error: 'DVF data ophalen mislukt', details: error.message },
-      { status: 500 }
-    );
-  }
+  const out = await dvfService({ lat: round3(c.lat), lon: round3(c.lon), radiusKm, dep });
+  return send(res, out.httpStatus, out.body, out.cache);
 }
