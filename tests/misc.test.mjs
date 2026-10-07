@@ -87,3 +87,21 @@ test('risques: 5xx wordt binnen het budget nog eens geprobeerd', async () => {
   const r = await fetchRisques({ lat: 43.3, lon: 5.37, insee: '13055', fetchImpl: f, budgetMs: 2000 });
   assert.equal(r.radon.status, 'ok'); assert.equal(n, 2);
 });
+
+test('risques: SIS via /ssp/conclusions_sis met latlon (lon,lat) en rayon', async () => {
+  const urls = [];
+  const f = async (url) => {
+    urls.push(url);
+    if (url.includes('/ssp/conclusions_sis')) {
+      return new Response(JSON.stringify({ results: 1, page: 1, total_pages: 1, data: [{ identifiant_ssp: 'SSP1', id_sis: '34SIS1', nom: 'Site', code_insee: '34172', statut_classification: 'Publié' }], response_code: 200 }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ data: [] }), { status: 200 });
+  };
+  const r = await fetchRisques({ lat: 43.6119, lon: 3.8772, insee: '34172', fetchImpl: f });
+  const sisUrl = urls.find((u) => u.includes('conclusions_sis'));
+  assert.ok(sisUrl.endsWith('/api/v1/ssp/conclusions_sis?latlon=3.8772,43.6119&rayon=500'), sisUrl);
+  assert.equal(r.bronnen.sis.status, 'ok');
+  assert.equal(r.pollution.aantal, 1);
+  assert.equal(r.pollution.sites[0].id_sis, '34SIS1');
+  assert.ok(!urls.some((u) => /\/api\/v1\/sis\?/.test(u)));
+});
