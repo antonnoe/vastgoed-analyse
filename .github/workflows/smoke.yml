@@ -56,8 +56,8 @@ jobs:
             else
               gh label create bron-uitval --repo "$GITHUB_REPOSITORY" --color B60205 --description "Externe bron langdurig onbereikbaar" 2>/dev/null || true
               gh issue create --repo "$GITHUB_REPOSITORY" --label bron-uitval \
-                --title "Géorisques onbereikbaar ($(date -u +%Y-%m-%d))" \
-                --body "$REDEN. De risico-tab toont 'Niet beschikbaar op dit moment'. Het issue sluit automatisch zodra de bron weer werkt. Run: $RUN_URL"
+                --title "Géorisques onbereikbaar vanaf de Vercel-server ($(date -u +%Y-%m-%d))" \
+                --body "Géorisques onbereikbaar vanaf de Vercel-server: $REDEN. De risico-tab toont 'Niet beschikbaar op dit moment'. Het issue sluit automatisch zodra de bron weer werkt. Run: $RUN_URL"
             fi
           elif [ -n "$OPEN" ]; then
             gh issue comment "$OPEN" --repo "$GITHUB_REPOSITORY" --body "Géorisques werkt weer. Run: $RUN_URL"

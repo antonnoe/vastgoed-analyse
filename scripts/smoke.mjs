@@ -111,7 +111,7 @@ if (gemeten.length || healthRisques) {
   const { writeFileSync, appendFileSync } = await import('node:fs');
   writeFileSync('.smoke-georisques', uit ? `down\n${reden}\n` : 'up\n');
   if (uit) {
-    const w = `⚠️ Bronuitval Géorisques: ${reden}. De smoke-test blijft groen; de risico-tab toont "Niet beschikbaar op dit moment".`;
+    const w = `⚠️ Géorisques onbereikbaar vanaf de Vercel-server: ${reden}. De smoke-test blijft groen; de risico-tab toont "Niet beschikbaar op dit moment".`;
     console.log(`\n${w}`);
     if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n> ${w}\n`);
   }

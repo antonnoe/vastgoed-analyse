@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
+  "regions": ["cdg1"],
   "functions": {
     "api/dvf.js": { "maxDuration": 60, "memory": 1024 },
     "api/health.js": { "maxDuration": 60, "memory": 1024 }
