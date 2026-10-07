@@ -28,7 +28,7 @@ async function get(path, timeoutMs = 70000) {
   const text = await res.text();
   let json = null;
   try { json = JSON.parse(text); } catch { /* geen JSON */ }
-  return { status: res.status, json, ms: Date.now() - t0 };
+  return { status: res.status, json, ms: Date.now() - t0, vercelId: res.headers.get('x-vercel-id') };
 }
 
 async function check(loc, route, fn) {
@@ -73,7 +73,7 @@ for (const L of LOCATIES) {
     for (const k of RISQUE_BRONNEN) if (!BRON_STATUS.has(b?.[k]?.status)) fouten.push(`status ontbreekt: ${k}`);
     const ok = RISQUE_BRONNEN.filter((k) => b?.[k]?.status === 'ok' || b?.[k]?.status === 'leeg').length;
     if (b && !fouten.length) risqueUit[L.naam] = ok === 0;
-    return { ok: !fouten.length, ms: r.ms, note: fouten.join('; ') || `${ok}/${RISQUE_BRONNEN.length} bronnen bereikbaar (${RISQUE_BRONNEN.filter((k) => !['ok','leeg'].includes(b[k].status)).join(',') || '-'} niet)` };
+    return { ok: !fouten.length, ms: r.ms, note: fouten.join('; ') || `${ok}/${RISQUE_BRONNEN.length} bronnen bereikbaar (${RISQUE_BRONNEN.filter((k) => !['ok','leeg'].includes(b[k].status)).join(',') || '-'} niet) ${r.vercelId || ''}` };
   });
   for (const route of ['urbanisme', 'cadastre', 'dpe']) {
     await check(L.naam, route, async () => {
