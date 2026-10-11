@@ -241,7 +241,7 @@
       </div>
       <div style="text-align:right;min-width:220px">
         <span class="badge">Live</span>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:6px" id="nowDate">—</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:6px" id="nowDate">n.v.t.</div>
       </div>
     </div>
 
@@ -256,22 +256,22 @@
       <div class="ifr-kpis">
         <div class="ifr-kpi">
           <div class="ifr-kpi-label">Verkopen</div>
-          <div class="ifr-kpi-value" id="kpiTx">—</div>
+          <div class="ifr-kpi-value" id="kpiTx">n.v.t.</div>
           <div class="ifr-kpi-note" id="kpiTxNote">Straal 5km, DVF</div>
         </div>
         <div class="ifr-kpi">
           <div class="ifr-kpi-label">Mediaan prijs/m²</div>
-          <div class="ifr-kpi-value" id="kpiAvgPrice">—</div>
+          <div class="ifr-kpi-value" id="kpiAvgPrice">n.v.t.</div>
           <div class="ifr-kpi-note" id="kpiAvgNote">Indicatief op basis DVF</div>
         </div>
         <div class="ifr-kpi">
           <div class="ifr-kpi-label">Risico’s</div>
-          <div class="ifr-kpi-value" id="kpiRisk">—</div>
+          <div class="ifr-kpi-value" id="kpiRisk">n.v.t.</div>
           <div class="ifr-kpi-note" id="kpiRiskNote">GéoRisques</div>
         </div>
         <div class="ifr-kpi">
           <div class="ifr-kpi-label">PLU / GPU</div>
-          <div class="ifr-kpi-value" id="kpiPLU">—</div>
+          <div class="ifr-kpi-value" id="kpiPLU">n.v.t.</div>
           <div class="ifr-kpi-note" id="kpiPLUNote">Géoportail Urbanisme</div>
         </div>
       </div>
@@ -358,7 +358,7 @@
 
     const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     const fmtDate = (iso) => { const d = iso ? new Date(iso) : null; return d && !isNaN(d) ? d.toLocaleDateString('nl-NL') : null; };
-    const fmtEur = (n) => (n == null ? '—' : Math.round(n).toLocaleString('nl-NL') + ' €');
+    const fmtEur = (n) => (n == null ? 'n.v.t.' : Math.round(n).toLocaleString('nl-NL') + ' €');
 
     // Vaste bronregel en uitleg bij elk DVF-resultaat (Licence Ouverte 2.0: bron en datum noemen). Datum komt uit de data.
     const MIN_VERKOPEN = 10;
@@ -432,7 +432,7 @@
             <button class="ifr-btn" style="text-align:left;background:#fff;color:var(--text);border:1px solid var(--border);font-weight:600"
               onclick='selectAddress(${JSON.stringify(f).replace(/'/g,"&#39;")})'>
               ${f.properties.label}
-              <div style="font-size:12px;color:var(--text-muted);font-weight:400">INSEE: ${f.properties.citycode || '—'} • Score: ${Math.round((f.properties.score||0)*100)/100}</div>
+              <div style="font-size:12px;color:var(--text-muted);font-weight:400">INSEE: ${f.properties.citycode || 'n.v.t.'} • Score: ${Math.round((f.properties.score||0)*100)/100}</div>
             </button>
           `).join('')}
         </div>
@@ -544,13 +544,13 @@
       const dvf = state.data.dvf;
       const ok = dvfOk(dvf);
       const geenDek = ok && dvfGeenDekking(dvf);
-      document.getElementById('kpiTx').textContent = !ok ? 'n/b' : (geenDek ? '—' : (dvf.meta.aantal != null ? String(dvf.meta.aantal) : 'te weinig'));
+      document.getElementById('kpiTx').textContent = !ok ? 'n/b' : (geenDek ? 'n.v.t.' : (dvf.meta.aantal != null ? String(dvf.meta.aantal) : 'te weinig'));
       document.getElementById('kpiTxNote').textContent = !ok ? 'Niet beschikbaar op dit moment' : (geenDek ? 'Buiten DVF-dekking' : `Straal ${DVF_RADIUS_KM}km, DVF${dvf.meta.verouderd ? ' (verouderd)' : ''}`);
 
       const st = ok ? dvf.statistiek && dvf.statistiek.alle : null;
-      document.getElementById('kpiAvgPrice').textContent = st && !st.te_weinig && st.n ? fmtEur(st.mediaan_m2) : '—';
-      document.getElementById('kpiAvgNote').textContent = st && !st.te_weinig && st.n
-        ? `P25 ${fmtEur(st.p25)} – P75 ${fmtEur(st.p75)} (n=${st.n})`
+      document.getElementById('kpiAvgPrice').textContent = st && !st.te_weinig && st.mediaan_m2 != null ? fmtEur(st.mediaan_m2) : 'n.v.t.';
+      document.getElementById('kpiAvgNote').textContent = st && !st.te_weinig && st.mediaan_m2 != null
+        ? `P25 tot P75: ${fmtEur(st.p25)} tot ${fmtEur(st.p75)}${st.n != null ? ` (n=${st.n})` : ''}`
         : (!ok ? 'Niet beschikbaar op dit moment' : (geenDek ? 'Buiten DVF-dekking' : 'Te weinig verkopen voor een betrouwbare mediaan'));
 
       renderDvfBlok();
@@ -584,12 +584,12 @@
       const st = dvfGoed ? dvf.statistiek?.alle : null;
 
       const links = [
-        { label: 'GéoRisques — kaart & rapport', url: `https://www.georisques.gouv.fr/`, icon: '⚠️' },
-        { label: 'Cadastre — kaart', url: `https://www.cadastre.gouv.fr/scpc/rechercherPlan.do`, icon: '🗺️' },
-        { label: 'Géoportail Urbanisme — PLU', url: `https://www.geoportail-urbanisme.gouv.fr/map/#/center/${lon}/${lat}/zoom/17`, icon: '🏛️' },
-        { label: 'DVF Explorer — Transacties', url: `https://explore.data.gouv.fr/immobilier?onglet=carte&lat=${lat}&lon=${lon}&zoom=16`, icon: '💶' },
+        { label: 'GéoRisques: kaart & rapport', url: `https://www.georisques.gouv.fr/`, icon: '⚠️' },
+        { label: 'Cadastre: kaart', url: `https://www.cadastre.gouv.fr/scpc/rechercherPlan.do`, icon: '🗺️' },
+        { label: 'Géoportail Urbanisme: PLU', url: `https://www.geoportail-urbanisme.gouv.fr/map/#/center/${lon}/${lat}/zoom/17`, icon: '🏛️' },
+        { label: 'DVF Explorer: transacties', url: `https://explore.data.gouv.fr/immobilier?onglet=carte&lat=${lat}&lon=${lon}&zoom=16`, icon: '💶' },
         { label: 'Observatoire DPE-AUDIT (ADEME)', url: `https://observatoire-dpe-audit.ademe.fr/`, icon: '🏷️' },
-        { label: 'ARCEP — Ma Connexion Internet', url: `https://maconnexioninternet.arcep.fr/?lat=${lat}&lon=${lon}&zoom=17`, icon: '📶' }
+        { label: 'ARCEP: Ma Connexion Internet', url: `https://maconnexioninternet.arcep.fr/?lat=${lat}&lon=${lon}&zoom=17`, icon: '📶' }
       ];
 
       c.innerHTML = `
@@ -607,7 +607,7 @@
             <h3 style="margin:0 0 10px;font-size:15px">📊 Snelle duiding</h3>
             <ul style="margin:0;padding-left:18px;font-size:13px">
               <li>DVF: ${!dvfGoed ? 'Niet beschikbaar op dit moment.' : (dvfGeenDekking(dvf) ? 'Buiten DVF-dekking, zie de melding onder de cijfers.' : (dvf.meta.aantal != null ? `<strong>${dvf.meta.aantal}</strong> verkopen binnen ${DVF_RADIUS_KM}km.` : 'Te weinig verkopen in deze omgeving.'))}</li>
-              <li>Mediaan woningen: <strong>${st && !st.te_weinig && st.n ? fmtEur(st.mediaan_m2) + '/m²' : '—'}</strong>${st && !st.te_weinig && st.n ? ` (P25 ${fmtEur(st.p25)}, P75 ${fmtEur(st.p75)}, n=${st.n}). Indicatie, geen taxatie.` : (dvfGoed && !dvfGeenDekking(dvf) ? ` ${TE_WEINIG}` : '.')}</li>
+              <li>Mediaan woningen: <strong>${st && !st.te_weinig && st.mediaan_m2 != null ? fmtEur(st.mediaan_m2) + '/m²' : 'n.v.t.'}</strong>${st && !st.te_weinig && st.mediaan_m2 != null ? ` (P25 ${fmtEur(st.p25)}, P75 ${fmtEur(st.p75)}${st.n != null ? `, n=${st.n}` : ''}). Indicatie, geen taxatie.` : (dvfGoed && !dvfGeenDekking(dvf) ? ` ${TE_WEINIG}` : '.')}</li>
               <li>Risico’s: kijk naar de tab “Risico’s” voor radon/klei/inondation/seismisch/SEVESO.</li>
               <li>PLU/GPU: check tab “Kadaster” voor planologische bronlinks.</li>
             </ul>
@@ -663,8 +663,8 @@
         return;
       }
 
-      const statRow = (label, x) => x && !x.te_weinig && x.n
-        ? `<tr><td>${label}</td><td class="right"><strong>${fmtEur(x.mediaan_m2)}</strong></td><td class="right">${fmtEur(x.p25)}</td><td class="right">${fmtEur(x.p75)}</td><td class="right">${x.n}</td></tr>`
+      const statRow = (label, x) => x && !x.te_weinig && x.mediaan_m2 != null
+        ? `<tr><td>${label}</td><td class="right"><strong>${fmtEur(x.mediaan_m2)}</strong></td><td class="right">${fmtEur(x.p25)}</td><td class="right">${fmtEur(x.p75)}</td><td class="right">${x.n != null ? x.n : 'n.v.t.'}</td></tr>`
         : `<tr><td>${label}</td><td colspan="4" class="right" style="color:var(--text-muted)">te weinig verkopen (minimaal ${MIN_VERKOPEN})</td></tr>`;
       const statRows = [statRow('Alle woningen', st.alle), statRow('Maison', st.maison), statRow('Appartement', st.appartement)].join('');
       const jaren = Array.isArray(dvf.meta.jaren) && dvf.meta.jaren.length ? (dvf.meta.jaren.length > 1 ? `${Math.min(...dvf.meta.jaren)} t/m ${Math.max(...dvf.meta.jaren)}` : String(dvf.meta.jaren[0])) : null;
@@ -684,7 +684,7 @@
             <tbody>${statRows}</tbody>
           </table></div>
 
-        <p style="margin-top:12px;font-size:12px;color:var(--text-muted)">Bronregel en uitleg staan direct onder de cijfers bovenaan.</p>
+        ${dvfBron(dvf)}
         ${explorer}
       `;
     }
@@ -773,10 +773,10 @@
         const p = cad.parcelle || {}, m = cad.commune || {};
         const item = (p.items || [])[0];
         kadasterHtml = `<div style="font-size:13px;color:var(--text-muted)">
-          Commune: <strong>${esc(m.nom || item?.commune || '—')}</strong><br>
-          INSEE: <strong>${esc(m.code || item?.code_insee || '—')}</strong><br>
+          Commune: <strong>${esc(m.nom || item?.commune || 'n.v.t.')}</strong><br>
+          INSEE: <strong>${esc(m.code || item?.code_insee || 'n.v.t.')}</strong><br>
           ${p.status === 'ok' && item
-            ? `Section: <strong>${esc(item.section || '—')}</strong><br>Perceel: <strong>${esc(item.numero || '—')}</strong>${item.contenance ? ` (${esc(item.contenance)} m²)` : ''}`
+            ? `Section: <strong>${esc(item.section || 'n.v.t.')}</strong><br>Perceel: <strong>${esc(item.numero || 'n.v.t.')}</strong>${item.contenance ? ` (${esc(item.contenance)} m²)` : ''}`
             : (p.status === 'leeg' ? 'Geen perceel gevonden op dit punt.' : 'Perceelgegevens niet beschikbaar op dit moment.')}
         </div>`;
       }
@@ -785,7 +785,7 @@
       if (!urb || urb.error || urb.status === 'time-out' || urb.status === 'fout') pluHtml = nb('Niet beschikbaar op dit moment.');
       else if (urb.status === 'leeg') pluHtml = nb('Geen digitaal plan gevonden voor deze locatie in het GPU. Controleer bij de gemeente.');
       else pluHtml = `<div style="font-size:13px;color:var(--text-muted)">${urb.zones.map(z => `
-          Zone <strong>${esc(z.libelle || '—')}</strong>${z.typezone ? ` (type ${esc(z.typezone)})` : ''}${z.libelong ? `<br>${esc(z.libelong)}` : ''}${z.document ? `<br>Document: ${esc(z.document)}` : ''}${z.url && /^https?:\/\//.test(z.url) ? `<br><a href="${esc(z.url)}" target="_blank">Plan openen</a>` : ''}`).join('<hr style="border:none;border-top:1px solid var(--border)">')}</div>`;
+          Zone <strong>${esc(z.libelle || 'n.v.t.')}</strong>${z.typezone ? ` (type ${esc(z.typezone)})` : ''}${z.libelong ? `<br>${esc(z.libelong)}` : ''}${z.document ? `<br>Document: ${esc(z.document)}` : ''}${z.url && /^https?:\/\//.test(z.url) ? `<br><a href="${esc(z.url)}" target="_blank">Plan openen</a>` : ''}`).join('<hr style="border:none;border-top:1px solid var(--border)">')}</div>`;
 
       c.innerHTML = `
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:12px">
@@ -873,9 +873,9 @@
       // Alleen benoemen wat feitelijk zo is: de API levert max. 20 records per opvraging.
       let meer = '';
       if (stats.total && stats.total > stats.fetched) {
-        meer = ` — de eerste ${stats.fetched} van in totaal ${stats.total.toLocaleString('nl-NL')} registraties die de API teruggeeft (max. 20 per opvraging)`;
+        meer = `, de eerste ${stats.fetched} van in totaal ${stats.total.toLocaleString('nl-NL')} registraties die de API teruggeeft (max. 20 per opvraging)`;
       } else if (stats.fetched > stats.n) {
-        meer = ` — ${stats.fetched - stats.n} registratie(s) zonder energielabel zijn niet meegeteld`;
+        meer = `, ${stats.fetched - stats.n} registratie(s) zonder energielabel zijn niet meegeteld`;
       }
       const gesRegel = stats.topGes
         ? `<div style="margin-top:4px">Meest voorkomende GES-label in deze ${stats.nGes} records: <strong>${stats.topGes}</strong> (${stats.topGesCount}×).</div>`

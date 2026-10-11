@@ -80,7 +80,8 @@ test('n >= 10: wel getal; JSON bevat geen adres, geen transactielijst, geen gemi
     const l = await loadDvf({ ...P, radiusKm: 5, dep: '34', base: ms.base, now: new Date('2025-10-07') });
     const r = buildResult(l, { ...P, radiusKm: 5, dep: '34' });
     assert.equal(r.statistiek.alle.te_weinig, false);
-    assert.equal(r.statistiek.alle.n, 12);
+    // 6 maison + 6 appartement: beide types onder 10, dus ook geen alle.n (zou het aantal per type verraden).
+    assert.equal(r.statistiek.alle.n, null);
     assert.ok(r.statistiek.alle.mediaan_m2 > 0);
     assert.ok(r.statistiek.alle.p25 > 0 && r.statistiek.alle.p75 > 0);
     assert.equal(r.meta.aantal, 12);
@@ -163,5 +164,35 @@ test('afwijkende €/m2 (<25% of >400% van mediaan) tellen niet mee in de statis
     assert.equal(r.statistiek.alle.n, 10);
     assert.equal(r.statistiek.alle.mediaan_m2, 3000);
     assert.equal(r.meta.aantal, 12);
+  } finally { ms.close(); }
+});
+
+test('alle.n wordt niet apart teruggegeven als een type op 1 tot 9 verkopen zit', async () => {
+  // 12 maison + 3 appartement: appartement < 10, dus alle.n zou het aantal appartementen verraden (alle.n - maison.n)
+  const regels = [
+    ...Array.from({ length: 12 }, (_, i) => mk(`m${i}`, 300000 + i * 1000, 100, 'Maison')),
+    ...Array.from({ length: 3 }, (_, i) => mk(`a${i}`, 150000 + i * 1000, 50, 'Appartement')),
+  ];
+  const ms = await mockServer({ '2025/34': csvGz(regels) });
+  try {
+    const l = await loadDvf({ ...P, radiusKm: 5, dep: '34', base: ms.base, now: new Date('2025-10-07') });
+    const r = buildResult(l, { ...P, radiusKm: 5, dep: '34' });
+    const s = r.statistiek;
+    assert.equal(s.appartement.te_weinig, true);
+    assert.equal(s.appartement.n, null);
+    assert.equal(s.maison.n, 12);
+    assert.equal(s.alle.te_weinig, false);
+    assert.ok(s.alle.mediaan_m2 > 0);
+    assert.equal(s.alle.n, null);
+  } finally { ms.close(); }
+});
+
+test('alle.n blijft zichtbaar als een type 0 verkopen heeft of beide types >= 10 zijn', async () => {
+  const ms = await mockServer({ '2025/34': csvGz(Array.from({ length: 11 }, (_, i) => mk(`z${i}`, 300000 + i * 1000, 100, 'Maison'))) });
+  try {
+    const l = await loadDvf({ ...P, radiusKm: 5, dep: '34', base: ms.base, now: new Date('2025-10-07') });
+    const r = buildResult(l, { ...P, radiusKm: 5, dep: '34' });
+    assert.equal(r.statistiek.appartement.n, null);
+    assert.equal(r.statistiek.alle.n, 11);
   } finally { ms.close(); }
 });
