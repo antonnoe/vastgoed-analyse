@@ -21,10 +21,15 @@ test('jsonResponse: noindex en geen wildcard', () => {
 test('vercel.json: noindex-header overal, geen CORS-wildcard; pagina heeft meta robots', () => {
   const v = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url)));
   const all = JSON.stringify(v);
-  assert.doesNotMatch(all, /Access-Control-Allow-Origin/);
+  // Alleen voor pagina's (niet /api): vaste origin, nooit een wildcard.
+  assert.doesNotMatch(all, /Access-Control-Allow-Origin","value":"\*/);
+  const cors = v.headers.filter((x) => x.headers.some((y) => y.key === 'Access-Control-Allow-Origin'));
+  assert.ok(cors.every((x) => x.source.includes('?!api/')));
   const h = v.headers.find((x) => x.source === '/(.*)');
   assert.ok(h.headers.some((x) => x.key === 'X-Robots-Tag' && x.value === 'noindex, nofollow'));
   const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.match(html, /<meta name="robots" content="noindex, nofollow"/);
   assert.doesNotMatch(html, /transactions|\.adresse/);
+  assert.doesNotMatch(html, /P25|P75|[ (,]n=/);
+  assert.match(html, /<title>[^<—–]*<\/title>/);
 });

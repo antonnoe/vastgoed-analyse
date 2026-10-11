@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>🏠 Frans Vastgoed Analyse Dashboard</title>
+  <title>Frans vastgoed analyseren: prijzen en risico’s per adres</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Mulish:wght@300;400;600&display=swap" rel="stylesheet">
 
   <style>
@@ -172,6 +172,25 @@
       letter-spacing:.02em;
     }
     .right{text-align:right}
+    .ifr-header-side{text-align:right;min-width:120px;flex:none}
+    .ifr-two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .ifr-two > *{min-width:0}
+    .ifr-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:12px;margin:14px 0 0}
+    .ifr-scroll .ifr-table{min-width:460px}
+    .ifr-scroll .ifr-table th,.ifr-scroll .ifr-table td{white-space:nowrap}
+    .ifr-nb{font-size:12px;color:var(--text-muted);margin:6px 0 0}
+    .ifr-card,.ifr-kpi,.infoBox{min-width:0}
+    .ifr-kpi-value,.ifr-kpi-note,.ifr-subtitle{overflow-wrap:anywhere}
+    @media (max-width: 700px){
+      .ifr-two{grid-template-columns:1fr}
+      .ifr-wrap{padding:18px 12px 40px}
+      .ifr-card{padding:14px}
+      .ifr-header{flex-direction:column;gap:8px}
+      .ifr-header-side{text-align:left}
+      .ifr-title{font-size:22px}
+      .ifr-search{flex-wrap:wrap}
+      .ifr-search input{min-width:0;flex:1 1 180px}
+    }
 
     .badge{
       display:inline-block;
@@ -236,10 +255,10 @@
 
     <div class="ifr-header">
       <div>
-        <h1 class="ifr-title">🏠 Frans Vastgoed Analyse Dashboard</h1>
+        <h1 class="ifr-title">Frans vastgoed analyseren: prijzen en risico’s per adres</h1>
         <p class="ifr-subtitle">Officiële Franse data (DVF, GéoRisques, IGN, GPU, ADEME/ARCEP) samengebracht voor Nederlandse kopers.</p>
       </div>
-      <div style="text-align:right;min-width:220px">
+      <div class="ifr-header-side">
         <span class="badge">Live</span>
         <div style="font-size:12px;color:var(--text-muted);margin-top:6px" id="nowDate">n.v.t.</div>
       </div>
@@ -362,6 +381,9 @@
 
     // Vaste bronregel en uitleg bij elk DVF-resultaat (Licence Ouverte 2.0: bron en datum noemen). Datum komt uit de data.
     const MIN_VERKOPEN = 10;
+    const UITLEG_KWART = 'Een kwart van de verkopen lag onder het eerste bedrag, een kwart boven het tweede; de helft ligt ertussen.';
+    const NIET_GETOOND = 'aantal niet getoond omdat een van de typen onder 10 verkopen heeft';
+    const KWART_HTML = (st) => `<span title="${UITLEG_KWART}" aria-label="${UITLEG_KWART}">laagste kwart tot hoogste kwart</span>: ${fmtEur(st.p25)} tot ${fmtEur(st.p75)}`;
     function dvfBron(dvf) {
       const m = dvf && dvf.meta;
       const d = m && fmtDate(m.laatste_datum);
@@ -545,13 +567,16 @@
       const ok = dvfOk(dvf);
       const geenDek = ok && dvfGeenDekking(dvf);
       document.getElementById('kpiTx').textContent = !ok ? 'n/b' : (geenDek ? 'n.v.t.' : (dvf.meta.aantal != null ? String(dvf.meta.aantal) : 'te weinig'));
-      document.getElementById('kpiTxNote').textContent = !ok ? 'Niet beschikbaar op dit moment' : (geenDek ? 'Buiten DVF-dekking' : `Straal ${DVF_RADIUS_KM}km, DVF${dvf.meta.verouderd ? ' (verouderd)' : ''}`);
+      const stA = ok && dvf.statistiek ? dvf.statistiek.alle : null;
+      const woningTxt = stA && !stA.te_weinig && stA.n != null ? `Prijs per m²: ${stA.n} woningen met bekende oppervlakte.` : 'Prijs per m²: alleen woningen met bekende oppervlakte.';
+      document.getElementById('kpiTxNote').textContent = !ok ? 'Niet beschikbaar op dit moment' : (geenDek ? 'Buiten DVF-dekking' : `Alle verkopen binnen ${DVF_RADIUS_KM}km, ook grond en bijgebouwen. ${woningTxt}${dvf.meta.verouderd ? ' (verouderd)' : ''}`);
 
       const st = ok ? dvf.statistiek && dvf.statistiek.alle : null;
       document.getElementById('kpiAvgPrice').textContent = st && !st.te_weinig && st.mediaan_m2 != null ? fmtEur(st.mediaan_m2) : 'n.v.t.';
-      document.getElementById('kpiAvgNote').textContent = st && !st.te_weinig && st.mediaan_m2 != null
-        ? `P25 tot P75: ${fmtEur(st.p25)} tot ${fmtEur(st.p75)}${st.n != null ? ` (n=${st.n})` : ''}`
-        : (!ok ? 'Niet beschikbaar op dit moment' : (geenDek ? 'Buiten DVF-dekking' : 'Te weinig verkopen voor een betrouwbare mediaan'));
+      const kn = document.getElementById('kpiAvgNote');
+      if (st && !st.te_weinig && st.mediaan_m2 != null) {
+        kn.innerHTML = `${KWART_HTML(st)} (${st.n != null ? `aantal verkopen: ${st.n}` : NIET_GETOOND})`;
+      } else kn.textContent = (!ok ? 'Niet beschikbaar op dit moment' : (geenDek ? 'Buiten DVF-dekking' : 'Te weinig verkopen voor een betrouwbare mediaan'));
 
       renderDvfBlok();
 
@@ -593,10 +618,10 @@
       ];
 
       c.innerHTML = `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="ifr-two">
           <div style="padding:18px;border:1px solid var(--border);border-radius:14px;background:#fff">
             <h3 style="margin:0 0 10px;font-size:15px">📍 Adres</h3>
-            <div style="font-family:monospace;background:var(--bg);padding:12px;border-radius:10px;border:1px solid var(--border);user-select:all">${f.properties.label}</div>
+            <div style="font-family:monospace;background:var(--bg);padding:12px;border-radius:10px;border:1px solid var(--border);user-select:all;overflow-wrap:anywhere">${f.properties.label}</div>
             <div style="margin-top:10px;font-size:13px;color:var(--text-muted)">
               Commune: <strong>${commune}</strong> • Postcode: <strong>${postcode}</strong> • INSEE: <strong>${code_insee}</strong><br>
               Coördinaten: <strong>${lat.toFixed(6)}, ${lon.toFixed(6)}</strong>
@@ -606,9 +631,9 @@
           <div style="padding:18px;border:1px solid var(--border);border-radius:14px;background:#fff">
             <h3 style="margin:0 0 10px;font-size:15px">📊 Snelle duiding</h3>
             <ul style="margin:0;padding-left:18px;font-size:13px">
-              <li>DVF: ${!dvfGoed ? 'Niet beschikbaar op dit moment.' : (dvfGeenDekking(dvf) ? 'Buiten DVF-dekking, zie de melding onder de cijfers.' : (dvf.meta.aantal != null ? `<strong>${dvf.meta.aantal}</strong> verkopen binnen ${DVF_RADIUS_KM}km.` : 'Te weinig verkopen in deze omgeving.'))}</li>
-              <li>Mediaan woningen: <strong>${st && !st.te_weinig && st.mediaan_m2 != null ? fmtEur(st.mediaan_m2) + '/m²' : 'n.v.t.'}</strong>${st && !st.te_weinig && st.mediaan_m2 != null ? ` (P25 ${fmtEur(st.p25)}, P75 ${fmtEur(st.p75)}${st.n != null ? `, n=${st.n}` : ''}). Indicatie, geen taxatie.` : (dvfGoed && !dvfGeenDekking(dvf) ? ` ${TE_WEINIG}` : '.')}</li>
-              <li>Risico’s: kijk naar de tab “Risico’s” voor radon/klei/inondation/seismisch/SEVESO.</li>
+              <li>DVF: ${!dvfGoed ? 'Niet beschikbaar op dit moment.' : (dvfGeenDekking(dvf) ? 'Buiten DVF-dekking, zie de melding onder de cijfers.' : (dvf.meta.aantal != null ? `<strong>${dvf.meta.aantal}</strong> verkopen binnen ${DVF_RADIUS_KM}km (alle soorten, ook grond en bijgebouwen).` : 'Te weinig verkopen in deze omgeving.'))}</li>
+              <li>Mediaan woningen: ${st && !st.te_weinig && st.mediaan_m2 != null ? `<strong>${fmtEur(st.mediaan_m2)}/m²</strong> (${KWART_HTML(st)}; ${st.n != null ? `aantal verkopen: ${st.n}` : NIET_GETOOND}). Indicatie, geen taxatie.` : (dvfGoed && !dvfGeenDekking(dvf) ? `geen cijfer. ${TE_WEINIG}` : 'geen cijfer.')}</li>
+              <li>Risico’s: kijk naar de tab “Risico’s” voor radon, klei, overstroming, aardbevingen en zware industrie (SEVESO).</li>
               <li>PLU/GPU: check tab “Kadaster” voor planologische bronlinks.</li>
             </ul>
           </div>
@@ -616,7 +641,7 @@
 
         <div style="margin-top:16px;padding:16px;border-radius:14px;background:var(--bg);border:1px solid var(--border)">
           <h3 style="margin:0 0 10px;font-size:15px">🔗 Direct naar officiële bronnen</h3>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px">
             ${links.map(l => `
               <a href="${l.url}" target="_blank" class="ifr-btn" style="background:#fff;color:var(--text);border:1px solid var(--border);font-weight:700;text-decoration:none;display:flex;align-items:center;gap:10px;justify-content:flex-start">
                 <span style="font-size:18px">${l.icon}</span>
@@ -664,9 +689,12 @@
       }
 
       const statRow = (label, x) => x && !x.te_weinig && x.mediaan_m2 != null
-        ? `<tr><td>${label}</td><td class="right"><strong>${fmtEur(x.mediaan_m2)}</strong></td><td class="right">${fmtEur(x.p25)}</td><td class="right">${fmtEur(x.p75)}</td><td class="right">${x.n != null ? x.n : 'n.v.t.'}</td></tr>`
-        : `<tr><td>${label}</td><td colspan="4" class="right" style="color:var(--text-muted)">te weinig verkopen (minimaal ${MIN_VERKOPEN})</td></tr>`;
+        ? `<tr><td>${label}</td><td class="right"><strong>${fmtEur(x.mediaan_m2)}</strong></td><td class="right">${fmtEur(x.p25)} tot ${fmtEur(x.p75)}</td><td class="right">${x.n != null ? x.n : '<span title="' + NIET_GETOOND + '">niet getoond*</span>'}</td></tr>`
+        : `<tr><td>${label}</td><td colspan="3" class="right" style="color:var(--text-muted)">te weinig**</td></tr>`;
       const statRows = [statRow('Alle woningen', st.alle), statRow('Maison', st.maison), statRow('Appartement', st.appartement)].join('');
+      const heeftNietGetoond = [st.alle, st.maison, st.appartement].some((x) => x && !x.te_weinig && x.mediaan_m2 != null && x.n == null);
+      const heeftTeWeinig = [st.alle, st.maison, st.appartement].some((x) => !(x && !x.te_weinig && x.mediaan_m2 != null));
+      const noten = (heeftNietGetoond ? `<p class="ifr-nb">* Het ${NIET_GETOOND}.</p>` : '') + (heeftTeWeinig ? `<p class="ifr-nb">** Te weinig verkopen: onder de ${MIN_VERKOPEN} verkopen tonen we geen cijfer, omdat het niet betrouwbaar is.</p>` : '');
       const jaren = Array.isArray(dvf.meta.jaren) && dvf.meta.jaren.length ? (dvf.meta.jaren.length > 1 ? `${Math.min(...dvf.meta.jaren)} t/m ${Math.max(...dvf.meta.jaren)}` : String(dvf.meta.jaren[0])) : null;
 
       c.innerHTML = `
@@ -674,15 +702,16 @@
           <div class="infoIcon">i</div>
           <div>
             <p>${dvf.meta.aantal != null ? `<strong>${esc(dvf.meta.aantal)}</strong> verkopen binnen ${DVF_RADIUS_KM}km${jaren ? `, jaren ${esc(jaren)}` : ''}.` : esc(TE_WEINIG)}</p>
-            <p style="color:var(--text-muted)">€/m² alleen voor verkopen van precies één woning met bekende woonoppervlakte; dépendances tellen niet mee. Uitschieters (onder 25% of boven 400% van de mediaan) tellen niet mee.</p>
+            <p style="color:var(--text-muted)">€/m² alleen voor verkopen van precies één woning met bekende woonoppervlakte; bijgebouwen (dépendances, zoals een schuur of garage) tellen niet mee. Uitschieters (onder 25% of boven 400% van de mediaan) tellen niet mee. Laagste kwart tot hoogste kwart: een kwart van de verkopen lag onder het eerste bedrag, een kwart boven het tweede; de helft ligt ertussen. Het aantal verkopen hier telt alleen woningen met bekende oppervlakte, dus het is lager dan het totaal hierboven (dat ook grond en bijgebouwen telt).</p>
           </div>
         </div>
 
-        <div style="overflow:auto;border:1px solid var(--border);border-radius:12px;margin:14px 0 0">
+        <div class="ifr-scroll" tabindex="0" role="region" aria-label="Prijzen per type woning, horizontaal scrollbaar">
           <table class="ifr-table">
-            <thead><tr><th>Mediaan €/m²</th><th class="right">Mediaan</th><th class="right">P25</th><th class="right">P75</th><th class="right">n</th></tr></thead>
+            <thead><tr><th>Type</th><th class="right">Mediaan €/m²</th><th class="right"><span title="${UITLEG_KWART}">Laagste kwart tot hoogste kwart</span></th><th class="right">Aantal verkopen</th></tr></thead>
             <tbody>${statRows}</tbody>
           </table></div>
+        ${noten}
 
         ${dvfBron(dvf)}
         ${explorer}
@@ -748,7 +777,7 @@
 
       c.innerHTML = `
         ${r.status === 'deels' ? `<div class="infoBox" style="margin-top:12px"><div class="infoIcon">i</div><div><p>Niet alle risicobronnen reageerden. Waar data ontbreekt staat "Niet beschikbaar op dit moment"; dat betekent niet dat er geen risico is.</p></div></div>` : ''}
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:12px">${cards.join('')}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px;margin-top:12px">${cards.join('')}</div>
         <div style="margin-top:16px">
           <a class="ifr-btn" target="_blank" href="${rapport}" style="text-decoration:none">Volledig Géorisques-rapport →</a>
         </div>
@@ -788,7 +817,7 @@
           Zone <strong>${esc(z.libelle || 'n.v.t.')}</strong>${z.typezone ? ` (type ${esc(z.typezone)})` : ''}${z.libelong ? `<br>${esc(z.libelong)}` : ''}${z.document ? `<br>Document: ${esc(z.document)}` : ''}${z.url && /^https?:\/\//.test(z.url) ? `<br><a href="${esc(z.url)}" target="_blank">Plan openen</a>` : ''}`).join('<hr style="border:none;border-top:1px solid var(--border)">')}</div>`;
 
       c.innerHTML = `
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:12px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px;margin-top:12px">
           <div style="padding:18px;border:1px solid var(--border);border-radius:14px;background:#fff">
             <h3 style="margin:0 0 10px;font-size:15px;color:var(--primary)">🗺️ Kadaster (IGN API Carto)</h3>
             ${kadasterHtml}
@@ -906,7 +935,7 @@
           <div style="font-family: monospace; background: #fff; padding: 12px; border-radius: 10px; border: 1px solid var(--border); user-select: all; font-size: 14px;">${adres}</div>
         </div>
 
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:20px">
           <div style="padding:24px;border-radius:12px;border:2px solid var(--primary);background:#fff">
             <h3 style="margin:0 0 16px;font-size:15px;color:var(--primary)">🏷️ Energielabel (DPE)</h3>
 
