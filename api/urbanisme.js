@@ -1,13 +1,15 @@
-import { jsonResponse, CACHE_LONG, NO_CACHE } from '../lib/http.js';
+import { jsonResponse, corsHeaders, CACHE_LONG, NO_CACHE } from '../lib/http.js';
 import { parseCoords } from '../lib/validate.js';
 import { fetchUrbanisme } from '../lib/sources.js';
 
 export const config = { runtime: 'edge', regions: ['cdg1'] };
 
 export default async function handler(request) {
+  const origin = request.headers.get('origin');
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(origin) });
   const c = parseCoords(new URL(request.url).searchParams);
-  if (c.error) return jsonResponse({ error: c.error }, { status: 400 });
+  if (c.error) return jsonResponse({ error: c.error }, { status: 400, origin });
   const out = await fetchUrbanisme({ lat: c.lat, lon: c.lon });
   const good = out.status === 'ok' || out.status === 'leeg';
-  return jsonResponse(out, { cache: good ? CACHE_LONG : NO_CACHE });
+  return jsonResponse(out, { cache: good ? CACHE_LONG : NO_CACHE, origin });
 }

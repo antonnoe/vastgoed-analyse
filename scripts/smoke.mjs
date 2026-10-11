@@ -56,10 +56,11 @@ for (const L of LOCATIES) {
   const q = `lat=${L.lat}&lon=${L.lon}`;
   await check(L.naam, 'dvf', async () => {
     const r = await get(`/api/dvf?${q}&radius=5&code_insee=${L.insee}&dep=${L.dep}`);
-    const m = r.json?.meta, n = r.json?.transactions?.length || 0;
+    const m = r.json?.meta, n = r.json?.meta?.aantal ?? 0;
     const fouten = [];
     if (r.status !== 200) fouten.push(`HTTP ${r.status}`);
-    if (!n) fouten.push('geen transacties');
+    if (r.json?.transactions || JSON.stringify(r.json || {}).includes('adresse')) fouten.push('API lekt transacties of adres');
+    if (!n) fouten.push('geen verkopen (of onder de ondergrens van 10)');
     if (!m?.laatste_datum) fouten.push('geen meta.laatste_datum');
     else if (m.laatste_datum < maandenTerug(12)) fouten.push(`laatste_datum ${m.laatste_datum} ouder dan 12 maanden`);
     if (m?.verouderd) fouten.push('terugvalbron (verouderd)');

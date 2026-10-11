@@ -1,18 +1,27 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "regions": ["cdg1"],
+  "regions": [
+    "cdg1"
+  ],
   "functions": {
-    "api/dvf.js": { "maxDuration": 60, "memory": 1024 },
-    "api/health.js": { "maxDuration": 60, "memory": 1024 }
+    "api/dvf.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "api/health.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
   },
   "headers": [
     {
-      "source": "/api/(.*)",
+      "source": "/(.*)",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
       ]
     }
   ]

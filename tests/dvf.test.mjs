@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { row, csvGz, mockServer } from './helpers.mjs';
-import { loadDvf, buildResult, percentile, stats } from '../lib/dvf-core.js';
-import { dvfService } from '../lib/dvf-service.js';
+import { loadDvf, buildResult, percentile, stats, MIN_VERKOPEN } from '../lib/dvf-core.js';
+import { dvfService, GEEN_DEKKING_DEPS } from '../lib/dvf-service.js';
 
 const P = { lat: 43.61, lon: 3.87 };
 const loc = (dLat = 0, dLon = 0) => ({ latitude: P.lat + dLat, longitude: P.lon + dLon });
@@ -55,33 +55,70 @@ test('stopt bij 404 na gevonden jaren; geen hardcoded jaartal', async () => {
   } finally { ms.close(); }
 });
 
-test('opschoning, statistiek, meta', async () => {
+test('opschoning, statistiek, meta (zonder losse transacties)', async () => {
   const ms = await mockServer({ '2025/34': csvGz(lines2025), '2024/34': csvGz(lines2024) });
   try {
     const l = await loadDvf({ ...P, radiusKm: 5, dep: '34', base: ms.base, now: new Date('2026-10-07') });
     const r = buildResult(l, { ...P, radiusKm: 5, dep: '34' });
     assert.equal(r.meta.laatste_datum, '2025-12-31'); // datasetdekking, ook buiten de straal
     assert.deepEqual(r.meta.jaren, [2025, 2024]);
-    const byId = (d) => r.transactions.find((t) => t.date === d);
-    const m1 = byId('2025-03-10');
-    assert.equal(m1.prix, 300000); // eenmalig geteld
-    assert.equal(m1.surface, 100);
-    assert.equal(m1.terrain, 500); // 400 (A1 dedup) + 100 (A2)
-    assert.equal(m1.woning, true);
-    assert.equal(byId('2025-07-01').woning, false);
-    assert.equal(byId('2025-07-01').type, 'Meerdere woningen');
-    assert.equal(byId('2025-08-01'), undefined); // VEFA
-    assert.equal(byId('2025-09-01').woning, false); // geen oppervlakte
-    assert.equal(byId('2025-12-31'), undefined); // buiten straal
-    const g = byId('2025-05-05');
-    assert.equal(g.type, 'Grond');
-    assert.equal(g.terrain, 750);
-    assert.match(g.adresse, /CHEMIN DE LA, TOUR/);
-    // woningen: 3000 (m1), 3000 (appartement), 2000 (2024)
-    assert.equal(r.statistiek.alle.n, 3);
-    assert.equal(r.statistiek.alle.mediaan_m2, 3000);
-    assert.equal(r.statistiek.maison.n, 2);
-    assert.equal(r.statistiek.appartement.n, 1);
+    assert.equal(r.transactions, undefined);
+    // Slechts 6 verkopen in de straal (m1, appartement, 2 woningen-mutatie, woning zonder m2, grond, 2024): onder de ondergrens
+    assert.equal(r.meta.te_weinig, true);
+    assert.equal(r.meta.aantal, null);
+    assert.equal(r.statistiek.alle.te_weinig, true);
+    assert.equal(r.statistiek.alle.mediaan_m2, null);
+  } finally { ms.close(); }
+});
+
+const mk = (id, prix, opp, type = 'Maison', adres = 'RUE GEHEIM') => row({ id_mutation: id, date_mutation: '2025-04-01', nature_mutation: 'Vente', valeur_fonciere: String(prix), adresse_numero: '7', adresse_nom_voie: adres, id_parcelle: id, type_local: type, surface_reelle_bati: String(opp), ...loc() });
+const twaalf = Array.from({ length: 12 }, (_, i) => mk(`t${i}`, 300000 + i * 3000, 100, i % 2 ? 'Appartement' : 'Maison'));
+
+test('n >= 10: wel getal; JSON bevat geen adres, geen transactielijst, geen gemiddelde', async () => {
+  const ms = await mockServer({ '2025/34': csvGz(twaalf) });
+  try {
+    const l = await loadDvf({ ...P, radiusKm: 5, dep: '34', base: ms.base, now: new Date('2025-10-07') });
+    const r = buildResult(l, { ...P, radiusKm: 5, dep: '34' });
+    assert.equal(r.statistiek.alle.te_weinig, false);
+    assert.equal(r.statistiek.alle.n, 12);
+    assert.ok(r.statistiek.alle.mediaan_m2 > 0);
+    assert.ok(r.statistiek.alle.p25 > 0 && r.statistiek.alle.p75 > 0);
+    assert.equal(r.meta.aantal, 12);
+    const json = JSON.stringify(r);
+    assert.doesNotMatch(json, /adresse|GEHEIM|afstand_m|transactions|gemiddelde|gemiddeld|"prix"/i);
+    assert.equal(r.transactions, undefined);
+  } finally { ms.close(); }
+});
+
+test('n < 10 geeft geen getal, wel te_weinig', async () => {
+  const ms = await mockServer({ '2025/34': csvGz(twaalf.slice(0, MIN_VERKOPEN - 1)) });
+  try {
+    const l = await loadDvf({ ...P, radiusKm: 5, dep: '34', base: ms.base, now: new Date('2025-10-07') });
+    const r = buildResult(l, { ...P, radiusKm: 5, dep: '34' });
+    for (const k of ['alle', 'maison', 'appartement']) {
+      const x = r.statistiek[k];
+      assert.equal(x.te_weinig, true);
+      assert.equal(x.n, null); assert.equal(x.mediaan_m2, null); assert.equal(x.p25, null); assert.equal(x.p75, null);
+    }
+    assert.equal(r.meta.aantal, null);
+    assert.equal(r.meta.te_weinig, true);
+  } finally { ms.close(); }
+});
+
+test('dekking: 57, 67, 68, 976 geven een dekkingsmelding op departementscode, zonder bestand op te halen', async () => {
+  assert.deepEqual(GEEN_DEKKING_DEPS, ['57', '67', '68', '976']);
+  const ms = await mockServer({});
+  try {
+    for (const dep of GEEN_DEKKING_DEPS) {
+      const out = await dvfService({ ...P, radiusKm: 5, dep, base: ms.base });
+      assert.equal(out.httpStatus, 200);
+      assert.equal(out.body.meta.status, 'geen_dekking');
+      assert.match(out.body.meta.dekking_tekst, /livre foncier/);
+      assert.match(out.body.meta.dekking_tekst, /Mayotte/);
+      assert.match(out.body.meta.dekking_tekst, /immobilier\.notaires\.fr/);
+      assert.equal(out.body.statistiek.alle.mediaan_m2, null);
+    }
+    assert.equal(ms.hits.length, 0);
   } finally { ms.close(); }
 });
 
@@ -97,7 +134,7 @@ test('terugval op oude API met verouderd=true, daarna eerlijke fout', async () =
   const ms = await mockServer({ '2026/34': 'error500', '2025/34': 'error500', '2024/34': 'error500' });
   const fake = async (url, o) => {
     if (String(url).startsWith('http://legacy')) {
-      return new Response(JSON.stringify({ transactions: [{ date: '2025-06-30', prix: 1, type: 'Maison', surface: 1 }] }), { status: 200 });
+      return new Response(JSON.stringify({ transactions: [{ date: '2025-06-30', prix: 1, type: 'Maison', surface: 1, adresse: '1 RUE LEK' }] }), { status: 200 });
     }
     return fetch(url, o);
   };
@@ -106,24 +143,25 @@ test('terugval op oude API met verouderd=true, daarna eerlijke fout', async () =
     assert.equal(out.httpStatus, 200);
     assert.equal(out.body.meta.verouderd, true);
     assert.equal(out.body.meta.laatste_datum, '2025-06-30');
+    assert.equal(out.body.transactions, undefined);
+    assert.doesNotMatch(JSON.stringify(out.body), /adresse|"prix"/);
+    assert.equal(out.body.statistiek.alle.te_weinig, true);
     const bad = await dvfService({ ...P, lat: 43.7, radiusKm: 5, dep: '34', base: ms.base, fetchImpl: async (u, o) => (String(u).startsWith('http://legacy') ? new Response('x', { status: 500 }) : fetch(u, o)), legacyUrl: 'http://legacy' });
     assert.equal(bad.httpStatus, 502);
     assert.equal(bad.body.meta.status, 'fout');
   } finally { ms.close(); }
 });
 
-test('afwijkende €/m2 (<25% of >400% van mediaan) gevlagd en buiten statistiek', async () => {
-  const mk = (id, prix, opp) => row({ id_mutation: id, date_mutation: '2025-04-01', nature_mutation: 'Vente', valeur_fonciere: String(prix), id_parcelle: id, type_local: 'Maison', surface_reelle_bati: String(opp), ...loc() });
-  // 3000, 3000, 3000 €/m2 + 1 €/m2 (symbolisch) + 20000 €/m2 (>400%)
-  const lines = [mk('a', 300000, 100), mk('b', 240000, 80), mk('c', 150000, 50), mk('d', 100, 100), mk('e', 2000000, 100)];
+test('afwijkende €/m2 (<25% of >400% van mediaan) tellen niet mee in de statistiek', async () => {
+  const mk2 = (id, prix, opp) => mk(id, prix, opp);
+  const goed = Array.from({ length: 10 }, (_, i) => mk2(`g${i}`, 300000, 100));
+  const lines = [...goed, mk2('d', 100, 100), mk2('e', 2000000, 100)];
   const ms = await mockServer({ '2025/34': csvGz(lines) });
   try {
     const l = await loadDvf({ ...P, radiusKm: 5, dep: '34', base: ms.base, now: new Date('2025-10-07') });
     const r = buildResult(l, { ...P, radiusKm: 5, dep: '34' });
-    assert.equal(r.transactions.filter((t) => t.afwijkend).length, 2);
-    assert.equal(r.statistiek.alle.n, 3);
+    assert.equal(r.statistiek.alle.n, 10);
     assert.equal(r.statistiek.alle.mediaan_m2, 3000);
-    assert.equal(r.statistiek.afwijkend_aantal, 2);
-    assert.equal(r.meta.aantal, 5);
+    assert.equal(r.meta.aantal, 12);
   } finally { ms.close(); }
 });

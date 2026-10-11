@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
   <title>🏠 Frans Vastgoed Analyse Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Mulish:wght@300;400;600&display=swap" rel="stylesheet">
 
@@ -254,7 +255,7 @@
 
       <div class="ifr-kpis">
         <div class="ifr-kpi">
-          <div class="ifr-kpi-label">Transacties</div>
+          <div class="ifr-kpi-label">Verkopen</div>
           <div class="ifr-kpi-value" id="kpiTx">—</div>
           <div class="ifr-kpi-note" id="kpiTxNote">Straal 5km, DVF</div>
         </div>
@@ -275,9 +276,11 @@
         </div>
       </div>
 
+      <div id="dvfBlok" style="margin:0 0 14px;padding:0 4px"></div>
+
       <div class="ifr-tabs">
         <div class="ifr-tab active" data-tab="overzicht">Overzicht</div>
-        <div class="ifr-tab" data-tab="transacties">Transacties</div>
+        <div class="ifr-tab" data-tab="transacties">Prijzen</div>
         <div class="ifr-tab" data-tab="risicos">Risico’s</div>
         <div class="ifr-tab" data-tab="kadaster">Kadaster</div>
         <div class="ifr-tab" data-tab="energie">Energie</div>
@@ -294,8 +297,8 @@
 
       <div class="ifr-panel hidden" id="panel-transacties">
         <div class="ifr-card" style="margin-top:14px">
-          <h2 style="margin:0 0 6px;font-size:18px">Transacties (DVF)</h2>
-          <p class="ifr-subtitle">Bron: Demandes de Valeurs Foncières — notariële aktes binnen 5km</p>
+          <h2 style="margin:0 0 6px;font-size:18px">Prijzen per m² (DVF)</h2>
+          <p class="ifr-subtitle">Mediaan van verkopen binnen 5km. Losse verkopen tonen wij niet; die staan in de officiële DVF Explorer.</p>
           <div id="transactiesContent"></div>
         </div>
       </div>
@@ -357,13 +360,29 @@
     const fmtDate = (iso) => { const d = iso ? new Date(iso) : null; return d && !isNaN(d) ? d.toLocaleDateString('nl-NL') : null; };
     const fmtEur = (n) => (n == null ? '—' : Math.round(n).toLocaleString('nl-NL') + ' €');
 
-    // Bronregel voor DVF: toont de werkelijke laatste datum uit de data, nooit een vast jaartal.
+    // Vaste bronregel en uitleg bij elk DVF-resultaat (Licence Ouverte 2.0: bron en datum noemen). Datum komt uit de data.
+    const MIN_VERKOPEN = 10;
     function dvfBron(dvf) {
       const m = dvf && dvf.meta;
       const d = m && fmtDate(m.laatste_datum);
-      const j = m && Array.isArray(m.jaren) && m.jaren.length ? (m.jaren.length > 1 ? `${Math.min(...m.jaren)} t/m ${Math.max(...m.jaren)}` : String(m.jaren[0])) : null;
-      if (m && m.verouderd) return `Bron: DVF via terugvalbron, <strong>verouderd</strong>${d ? `, transacties t/m ${d}` : ''}. De officiële bron was nu niet bereikbaar.`;
-      return `Bron: DVF (data.gouv.fr)${j ? `, jaren ${j}` : ''}${d ? `, transacties t/m ${d}` : ''}`;
+      const tot = d ? ` Gegevens tot en met ${esc(d)}.` : '';
+      const oud = m && m.verouderd ? ' <strong>Let op: de officiële bron was nu niet bereikbaar.</strong>' : '';
+      return `<p class="dvf-bron" style="margin:10px 0 0;font-size:12px;color:var(--text-muted)">Bron: <a href="https://www.data.gouv.fr/datasets/demandes-de-valeurs-foncieres/" target="_blank" rel="noopener">DGFiP, Demandes de valeurs foncières (DVF), via data.gouv.fr</a>, <a href="https://www.etalab.gouv.fr/licence-ouverte-open-licence" target="_blank" rel="noopener">Licence Ouverte 2.0</a>.${tot} Bewerking: Infofrankrijk (mediaan €/m², alleen verkopen van één woning).${oud}</p>`;
+    }
+    function dvfUitleg(dvf) {
+      const d = dvf && dvf.meta && fmtDate(dvf.meta.laatste_datum);
+      const wanneer = d ? esc(d) : 'onbekend';
+      return `<p class="dvf-uitleg" style="margin:8px 0 0;font-size:13px;color:var(--text-muted)">Dit cijfer is de mediaan (het midden) van de verkopen in deze omgeving. Het register wordt twee keer per jaar ververst; de meest recente verkoop in deze gegevens is van ${wanneer}. Recentere verkopen ontbreken en ook later kunnen er nog verkopen aan oudere jaren worden toegevoegd. Een instapklare woning in het centrum en een opknapper aan de rand liggen ver uit elkaar, de staat van de woning en de ligging zitten niet in dit cijfer. Kosten voor notaris en makelaar zitten er ook niet in. Gebruik dit als indicatie, niet als taxatie.</p>`;
+    }
+    const DEKKING_HTML = 'Voor de Elzas en de Moezel worden verkopen in een ander register ingeschreven (livre foncier) dat niet in DVF zit. Ook Mayotte ontbreekt. Voor prijzen in deze gebieden: de prijzenkaart van de notarissen, <a href="https://www.immobilier.notaires.fr/" target="_blank" rel="noopener">https://www.immobilier.notaires.fr/</a>';
+    const TE_WEINIG = 'Te weinig verkopen in deze omgeving voor een betrouwbare mediaan (minimaal 10).';
+    const dvfGeenDekking = (dvf) => !!(dvf && dvf.meta && dvf.meta.status === 'geen_dekking');
+    // Blok direct onder de KPI-rij: dekkingsmelding, of bronregel plus uitleg.
+    function renderDvfBlok() {
+      const el = document.getElementById('dvfBlok');
+      const dvf = state.data.dvf;
+      if (!dvfOk(dvf)) { el.innerHTML = ''; return; }
+      el.innerHTML = dvfGeenDekking(dvf) ? `<p style="font-size:13px">${DEKKING_HTML}</p>` : dvfBron(dvf) + dvfUitleg(dvf);
     }
     const dvfOk = (dvf) => !!(dvf && !dvf.error && dvf.meta && dvf.meta.status !== 'fout');
 
@@ -478,7 +497,7 @@
         state.data.dvf = await r.json();
         if (!r.ok && !state.data.dvf.error) state.data.dvf.error = 'DVF-data niet beschikbaar';
       } catch (e) {
-        state.data.dvf = { transactions: [], error: 'DVF-data niet beschikbaar' };
+        state.data.dvf = { error: 'DVF-data niet beschikbaar' };
       }
     }
 
@@ -524,14 +543,17 @@
     function updateKPIs(){
       const dvf = state.data.dvf;
       const ok = dvfOk(dvf);
-      document.getElementById('kpiTx').textContent = ok ? String((dvf.transactions || []).length ? dvf.meta.aantal : 0) : 'n/b';
-      document.getElementById('kpiTxNote').textContent = ok ? `Straal ${DVF_RADIUS_KM}km, DVF${dvf.meta.verouderd ? ' (verouderd)' : ''}` : 'Niet beschikbaar op dit moment';
+      const geenDek = ok && dvfGeenDekking(dvf);
+      document.getElementById('kpiTx').textContent = !ok ? 'n/b' : (geenDek ? '—' : (dvf.meta.aantal != null ? String(dvf.meta.aantal) : 'te weinig'));
+      document.getElementById('kpiTxNote').textContent = !ok ? 'Niet beschikbaar op dit moment' : (geenDek ? 'Buiten DVF-dekking' : `Straal ${DVF_RADIUS_KM}km, DVF${dvf.meta.verouderd ? ' (verouderd)' : ''}`);
 
       const st = ok ? dvf.statistiek && dvf.statistiek.alle : null;
-      document.getElementById('kpiAvgPrice').textContent = st && st.n ? fmtEur(st.mediaan_m2) : '—';
-      document.getElementById('kpiAvgNote').textContent = st && st.n
+      document.getElementById('kpiAvgPrice').textContent = st && !st.te_weinig && st.n ? fmtEur(st.mediaan_m2) : '—';
+      document.getElementById('kpiAvgNote').textContent = st && !st.te_weinig && st.n
         ? `P25 ${fmtEur(st.p25)} – P75 ${fmtEur(st.p75)} (n=${st.n})`
-        : (ok ? 'Te weinig woningverkopen' : 'Niet beschikbaar op dit moment');
+        : (!ok ? 'Niet beschikbaar op dit moment' : (geenDek ? 'Buiten DVF-dekking' : 'Te weinig verkopen voor een betrouwbare mediaan'));
+
+      renderDvfBlok();
 
       const r = state.data.risques;
       const rOk = r && !r.error && r.status !== 'niet_beschikbaar';
@@ -584,8 +606,8 @@
           <div style="padding:18px;border:1px solid var(--border);border-radius:14px;background:#fff">
             <h3 style="margin:0 0 10px;font-size:15px">📊 Snelle duiding</h3>
             <ul style="margin:0;padding-left:18px;font-size:13px">
-              <li>DVF: ${dvfGoed ? `<strong>${dvf.meta.aantal}</strong> verkopen binnen ${DVF_RADIUS_KM}km. ${dvfBron(dvf)}.` : 'Niet beschikbaar op dit moment.'}</li>
-              <li>Mediaan woningen: <strong>${st && st.n ? fmtEur(st.mediaan_m2) + '/m²' : '—'}</strong>${st && st.n ? ` (P25 ${fmtEur(st.p25)}, P75 ${fmtEur(st.p75)}, n=${st.n}). Indicatie, geen taxatie.` : '.'}</li>
+              <li>DVF: ${!dvfGoed ? 'Niet beschikbaar op dit moment.' : (dvfGeenDekking(dvf) ? 'Buiten DVF-dekking, zie de melding onder de cijfers.' : (dvf.meta.aantal != null ? `<strong>${dvf.meta.aantal}</strong> verkopen binnen ${DVF_RADIUS_KM}km.` : 'Te weinig verkopen in deze omgeving.'))}</li>
+              <li>Mediaan woningen: <strong>${st && !st.te_weinig && st.n ? fmtEur(st.mediaan_m2) + '/m²' : '—'}</strong>${st && !st.te_weinig && st.n ? ` (P25 ${fmtEur(st.p25)}, P75 ${fmtEur(st.p75)}, n=${st.n}). Indicatie, geen taxatie.` : (dvfGoed && !dvfGeenDekking(dvf) ? ` ${TE_WEINIG}` : '.')}</li>
               <li>Risico’s: kijk naar de tab “Risico’s” voor radon/klei/inondation/seismisch/SEVESO.</li>
               <li>PLU/GPU: check tab “Kadaster” voor planologische bronlinks.</li>
             </ul>
@@ -623,80 +645,47 @@
         return;
       }
 
-      const txs = dvf.transactions || [];
       const st = dvf.statistiek || {};
 
-      if (dvf.meta.status === 'geen_dekking') {
+      if (dvfGeenDekking(dvf)) {
         c.innerHTML = `
           <div class="ifr-empty">
             <div class="ifr-empty-icon">📭</div>
-            <p>Voor dit departement is geen DVF-bestand gevonden. DVF dekt niet heel Frankrijk (o.a. Elzas-Moezel en Mayotte vallen buiten de dataset).</p>
+            <p>${DEKKING_HTML}</p>
           </div>`;
         return;
       }
 
-      if (!txs.length) {
-        c.innerHTML = `
-          <div class="ifr-empty">
-            <div class="ifr-empty-icon">📭</div>
-            <p>Geen verkopen gevonden binnen ${DVF_RADIUS_KM}km in de beschikbare jaren (${esc((dvf.meta.jaren || []).join(', '))}).</p>
-            <div class="infoBox" style="max-width:700px;margin:14px auto 0"><div class="infoIcon">i</div><div><p>${dvfBron(dvf)}. In landelijke gebieden zijn weinig verkopen.</p></div></div>
-          </div>`;
+      const explorer = `<p style="margin-top:12px;font-size:13px">Losse verkopen bekijken? Dat kan in de <a href="https://explore.data.gouv.fr/immobilier" target="_blank" rel="noopener">officiële DVF Explorer</a> van de overheid.</p>`;
+
+      if (dvf.meta.verouderd) {
+        c.innerHTML = `<div class="infoBox" style="margin-top:12px"><div class="infoIcon">i</div><div><p>De officiële bron was nu niet bereikbaar, daarom tonen we geen cijfers.</p></div></div>${dvfBron(dvf)}${explorer}`;
         return;
       }
 
-      const statRow = (label, x) => x && x.n
-        ? `<tr><td>${label}</td><td class="right"><strong>${fmtEur(x.mediaan_m2)}</strong></td><td class="right">${fmtEur(x.p25)}</td><td class="right">${fmtEur(x.p75)}</td><td class="right">${x.n}</td></tr>` : '';
+      const statRow = (label, x) => x && !x.te_weinig && x.n
+        ? `<tr><td>${label}</td><td class="right"><strong>${fmtEur(x.mediaan_m2)}</strong></td><td class="right">${fmtEur(x.p25)}</td><td class="right">${fmtEur(x.p75)}</td><td class="right">${x.n}</td></tr>`
+        : `<tr><td>${label}</td><td colspan="4" class="right" style="color:var(--text-muted)">te weinig verkopen (minimaal ${MIN_VERKOPEN})</td></tr>`;
       const statRows = [statRow('Alle woningen', st.alle), statRow('Maison', st.maison), statRow('Appartement', st.appartement)].join('');
+      const jaren = Array.isArray(dvf.meta.jaren) && dvf.meta.jaren.length ? (dvf.meta.jaren.length > 1 ? `${Math.min(...dvf.meta.jaren)} t/m ${Math.max(...dvf.meta.jaren)}` : String(dvf.meta.jaren[0])) : null;
 
       c.innerHTML = `
         <div class="infoBox" style="margin-top:12px">
           <div class="infoIcon">i</div>
           <div>
-            <p><strong>${esc(dvf.meta.aantal)}</strong> verkopen binnen ${DVF_RADIUS_KM}km. ${dvfBron(dvf)}.</p>
-            ${st.afwijkend_aantal ? `<p style="color:var(--text-muted)"><strong>${esc(st.afwijkend_aantal)}</strong> verkoop(en) gemarkeerd als "afwijkend" (grijs): een €/m² onder 25% of boven 400% van de mediaan${st.afwijkend_grens_m2 ? ` (buiten ${fmtEur(st.afwijkend_grens_m2.onder)} – ${fmtEur(st.afwijkend_grens_m2.boven)})` : ''}, vaak een symbolische prijs of een niet-gemelde samenstelling. Ze tellen niet mee in de statistiek.</p>` : ''}
-            <p style="color:var(--text-muted)">€/m² alleen voor verkopen van precies één woning met bekende woonoppervlakte; dépendances tellen niet mee. Indicatie, geen taxatie.</p>
+            <p>${dvf.meta.aantal != null ? `<strong>${esc(dvf.meta.aantal)}</strong> verkopen binnen ${DVF_RADIUS_KM}km${jaren ? `, jaren ${esc(jaren)}` : ''}.` : esc(TE_WEINIG)}</p>
+            <p style="color:var(--text-muted)">€/m² alleen voor verkopen van precies één woning met bekende woonoppervlakte; dépendances tellen niet mee. Uitschieters (onder 25% of boven 400% van de mediaan) tellen niet mee.</p>
           </div>
         </div>
 
-        ${statRows ? `<div style="overflow:auto;border:1px solid var(--border);border-radius:12px;margin-bottom:14px">
+        <div style="overflow:auto;border:1px solid var(--border);border-radius:12px;margin:14px 0 0">
           <table class="ifr-table">
             <thead><tr><th>Mediaan €/m²</th><th class="right">Mediaan</th><th class="right">P25</th><th class="right">P75</th><th class="right">n</th></tr></thead>
             <tbody>${statRows}</tbody>
-          </table></div>` : ''}
+          </table></div>
 
-        <div style="overflow:auto;border:1px solid var(--border);border-radius:12px">
-          <table class="ifr-table">
-            <thead>
-              <tr>
-                <th>Datum</th>
-                <th>Type</th>
-                <th class="right">Prijs</th>
-                <th class="right">m²</th>
-                <th class="right">Terrein m²</th>
-                <th class="right">€/m²</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${txs.slice(0, 25).map(t => {
-                const ppm2 = t.woning && t.surface ? Math.round(t.prix / t.surface) : null;
-                const af = t.afwijkend ? ' style="color:#9a9a9a;background:#f5f5f5"' : '';
-                return `
-                  <tr${af}>
-                    <td>${fmtDate(t.date) || '—'}</td>
-                    <td><span class="badge">${esc(t.type || '—')}</span>${t.afwijkend ? ' <span class="badge" style="background:#9a9a9a">afwijkend</span>' : ''}</td>
-                    <td class="right"><strong>${fmtEur(t.prix)}</strong></td>
-                    <td class="right">${t.woning && t.surface ? esc(t.surface) : '—'}</td>
-                    <td class="right">${t.terrain ? Math.round(t.terrain).toLocaleString('nl-NL') : '—'}</td>
-                    <td class="right">${ppm2 ? ppm2.toLocaleString('nl-NL') : '—'}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-
-        ${txs.length > 25 ? `<p style="margin-top:12px;font-size:12px;color:var(--text-muted)">Toont 25 van ${esc(dvf.meta.aantal)} verkopen</p>` : ''}
+        <p style="margin-top:12px;font-size:12px;color:var(--text-muted)">Bronregel en uitleg staan direct onder de cijfers bovenaan.</p>
+        ${explorer}
       `;
     }
 

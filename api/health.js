@@ -1,7 +1,7 @@
 // Gezondheid van alle bronnen met een vast testpunt (Marseille, INSEE 13055).
 // Kritiek: dvf en ban. HTTP 503 als een kritieke bron uitvalt; andere uitval geeft status "degraded".
 import { loadDvf } from '../lib/dvf-core.js';
-import { fetchJson, CORS } from '../lib/http.js';
+import { fetchJson, corsHeaders } from '../lib/http.js';
 import { fetchRisques } from '../lib/risques-core.js';
 import { fetchUrbanisme, fetchCadastre, fetchDpe } from '../lib/sources.js';
 
@@ -63,6 +63,7 @@ export default async function handler(req, res) {
   // ?quick=1: alleen de gedeployde commit (voor wachten op een deploy), geen bronnentest.
   if (new URL(req.url, 'http://localhost').searchParams.get('quick')) {
     res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     res.setHeader('Content-Type', 'application/json');
     return res.end(JSON.stringify({ commit: process.env.VERCEL_GIT_COMMIT_SHA || null }));
   }
@@ -71,6 +72,6 @@ export default async function handler(req, res) {
   res.statusCode = httpStatus;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=300');
-  for (const [k, v] of Object.entries(CORS)) res.setHeader(k, v);
+  for (const [k, v] of Object.entries(corsHeaders(req.headers.origin))) res.setHeader(k, v);
   res.end(JSON.stringify(body));
 }
